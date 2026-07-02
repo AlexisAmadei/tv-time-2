@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>tv-time-2 — key screens</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700;9..144,800&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --base:#16131E; --raised:#211C2C; --sunken:#2A2438;
+    --text:#ECE7F2; --muted:#8A82A0; --hair:#2E2A3A;
+    --primary:#EC5A92; --primary-press:#D43F7B; --cool:#45C2CF; --gold:#F2C14E;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{background:#0e0c12;color:var(--text);font-family:"DM Sans",system-ui,sans-serif;
+    padding:28px 16px 60px;line-height:1.4;}
+  .head{max-width:1100px;margin:0 auto 22px;text-align:center;}
+  .head h1{font-family:"Fraunces",serif;font-weight:800;font-size:26px;letter-spacing:-0.01em;}
+  .head p{color:#a49bb5;font-size:13px;margin-top:5px;}
+  .rail{max-width:1100px;margin:0 auto;display:flex;gap:22px;flex-wrap:wrap;justify-content:center;}
+  .frame{width:300px;}
+  .cap{font-size:11px;text-transform:uppercase;letter-spacing:0.08em;color:#8a82a0;font-weight:700;text-align:center;margin-bottom:8px;}
+  .screen{background:var(--base);border-radius:26px;overflow:hidden;border:1px solid rgba(255,255,255,0.07);
+    box-shadow:0 10px 34px rgba(0,0,0,0.5);min-height:600px;position:relative;}
+  .status{height:30px;display:flex;align-items:center;justify-content:space-between;padding:0 18px;font-size:11px;font-weight:600;color:var(--text);}
+  /* logo/appbar */
+  .appbar{display:flex;align-items:center;justify-content:space-between;padding:8px 16px 8px;}
+  .logo{font-family:"Fraunces",serif;font-weight:800;font-size:22px;color:var(--primary);}
+  .avatar{width:28px;height:28px;border-radius:999px;background:var(--cool);color:var(--base);display:flex;align-items:center;justify-content:center;font-size:14px;}
+  .kicker{font-size:10px;text-transform:uppercase;letter-spacing:0.11em;color:var(--cool);font-weight:700;}
+  .sl{font-size:10px;text-transform:uppercase;letter-spacing:0.09em;color:var(--muted);font-weight:700;padding:12px 16px 8px;}
+  /* cards */
+  .card{margin:0 16px 12px;background:var(--raised);border-radius:13px;overflow:hidden;display:flex;}
+  .poster{width:66px;min-height:96px;flex-shrink:0;background:linear-gradient(160deg,var(--cool),#2b8791);color:var(--base);display:flex;align-items:flex-end;justify-content:center;font-size:22px;padding-bottom:6px;}
+  .poster.p2{background:linear-gradient(160deg,var(--primary),#c23f76);}
+  .poster.p3{background:linear-gradient(160deg,var(--gold),#c99a2e);}
+  .cbody{padding:10px 12px;flex:1;}
+  .t{font-family:"Fraunces",serif;font-weight:700;font-size:15px;}
+  .m{font-size:11px;color:var(--muted);margin:2px 0 7px;}
+  .stars{font-size:13px;letter-spacing:1px;color:var(--gold);}
+  .stars .e{opacity:.28;}
+  .moods{display:flex;gap:5px;margin-top:7px;}
+  .mood{font-size:12px;padding:2px 6px;border-radius:999px;background:var(--base);border:1px solid var(--hair);}
+  .mood.on{background:var(--sunken);border-color:var(--primary);}
+  .pill{display:inline-block;margin-top:9px;font-size:9.5px;font-weight:800;text-transform:uppercase;letter-spacing:0.05em;padding:4px 9px;border-radius:8px;background:var(--primary);color:#fff;}
+  /* watchlist mini row */
+  .row{display:flex;gap:10px;padding:2px 16px 12px;overflow:hidden;}
+  .mini{width:58px;}
+  .mp{height:80px;border-radius:11px;display:flex;align-items:flex-end;justify-content:center;font-size:19px;padding-bottom:5px;color:var(--base);}
+  .ml{font-size:9.5px;margin-top:4px;text-align:center;color:var(--muted);}
+  /* nav */
+  .nav{position:absolute;bottom:0;left:0;right:0;display:flex;align-items:center;justify-content:space-around;padding:9px 8px 12px;background:var(--raised);border-top:1px solid var(--hair);}
+  .ni{font-size:18px;opacity:.5;}
+  .ni.on{opacity:1;filter:drop-shadow(0 0 0 var(--primary));}
+  .lbl{display:block;font-size:8px;text-align:center;margin-top:2px;color:var(--muted);font-weight:600;}
+  .ni.on .lbl{color:var(--primary);}
+  .fab{width:46px;height:46px;border-radius:14px;background:var(--primary);color:#fff;display:flex;align-items:center;justify-content:center;font-size:24px;font-weight:600;margin-top:-18px;box-shadow:0 6px 16px rgba(236,90,146,0.45);}
+  /* title detail hero */
+  .hero{padding:0 0 8px;}
+  .backdrop{height:150px;background:linear-gradient(160deg,var(--cool),#1c1330);position:relative;display:flex;align-items:flex-end;padding:14px 16px;}
+  .backdrop .bell{position:absolute;top:12px;right:14px;width:34px;height:34px;border-radius:999px;background:rgba(0,0,0,0.35);display:flex;align-items:center;justify-content:center;font-size:16px;border:1px solid var(--gold);}
+  .htitle{font-family:"Fraunces",serif;font-weight:800;font-size:26px;line-height:1.05;}
+  .hmeta{font-size:11px;color:var(--text);opacity:.85;margin-top:2px;}
+  .actions{display:flex;gap:8px;padding:12px 16px 4px;}
+  .btn{flex:1;text-align:center;font-size:12px;font-weight:700;padding:11px;border-radius:11px;}
+  .btn.primary{background:var(--primary);color:#fff;}
+  .btn.ghost{background:var(--raised);color:var(--text);border:1px solid var(--hair);}
+  .ep{display:flex;align-items:center;gap:10px;margin:0 16px;padding:11px 0;border-bottom:1px solid var(--hair);}
+  .epnum{width:26px;height:26px;border-radius:8px;background:var(--sunken);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:var(--muted);flex-shrink:0;}
+  .epnum.done{background:var(--primary);color:#fff;}
+  .eptitle{flex:1;font-size:12.5px;}
+  .eptitle small{display:block;color:var(--muted);font-size:10px;}
+  .epcheck{font-size:15px;color:var(--muted);}
+  .epcheck.done{color:var(--primary);}
+  .seasonbtn{margin:12px 16px 0;text-align:center;font-size:11.5px;font-weight:700;color:var(--cool);padding:9px;border:1px dashed var(--hair);border-radius:11px;}
+  /* log sheet */
+  .dim{position:absolute;inset:0;background:rgba(8,6,12,0.55);}
+  .sheet{position:absolute;left:0;right:0;bottom:0;background:var(--raised);border-radius:18px 18px 0 0;padding:16px 16px 22px;}
+  .grab{width:38px;height:4px;border-radius:999px;background:var(--hair);margin:0 auto 14px;}
+  .sheet h3{font-family:"Fraunces",serif;font-weight:700;font-size:18px;text-align:center;}
+  .sheet .sub{font-size:11px;color:var(--muted);text-align:center;margin:3px 0 16px;}
+  .bigstars{font-size:30px;text-align:center;letter-spacing:4px;color:var(--gold);}
+  .askmood{font-size:11px;color:var(--muted);text-align:center;margin:16px 0 8px;}
+  .moodrow{display:flex;gap:8px;justify-content:center;}
+  .moodbig{font-size:20px;padding:7px 10px;border-radius:999px;background:var(--base);border:1px solid var(--hair);}
+  .moodbig.on{background:var(--sunken);border-color:var(--primary);transform:scale(1.05);}
+  .sheetcta{margin-top:18px;display:flex;gap:8px;}
+  .skip{flex:1;text-align:center;font-size:12px;font-weight:700;padding:12px;border-radius:11px;background:var(--base);color:var(--muted);}
+  .save{flex:2;text-align:center;font-size:12px;font-weight:700;padding:12px;border-radius:11px;background:var(--primary);color:#fff;}
+  .reward{margin:14px 16px 0;background:var(--sunken);border-radius:11px;padding:11px 12px;font-size:11.5px;}
+  .reward b{color:var(--gold);font-family:"Fraunces",serif;}
+</style>
+</head>
+<body>
+  <div class="head">
+    <h1>tv-time-2 — key screens</h1>
+    <p>Final palette (VHS Dusk / hero dark) · Fraunces + DM Sans. Home · Title detail · The bedtime log.</p>
+  </div>
+
+  <div class="rail">
+
+    <!-- ============ HOME ============ -->
+    <div class="frame">
+      <div class="cap">Home · Up Next</div>
+      <div class="screen">
+        <div class="status"><span>9:41</span><span>􀙇 􀛨 􀛧</span></div>
+        <div class="appbar"><span class="logo">tv-time</span><span class="avatar">🙂</span></div>
+
+        <div class="sl">Continue watching</div>
+        <div class="card">
+          <div class="poster">🎬</div>
+          <div class="cbody">
+            <div class="t">The Bear</div>
+            <div class="m">Season 3 · Ep 5 next</div>
+            <div class="stars">★★★★<span class="e">★</span></div>
+            <div class="moods"><span class="mood on">😭</span><span class="mood">😱</span></div>
+            <span class="pill">Continue</span>
+          </div>
+        </div>
+
+        <div class="sl">Your watchlist</div>
+        <div class="row">
+          <div class="mini"><div class="mp" style="background:linear-gradient(160deg,#ec5a92,#c23f76)">🍿</div><div class="ml">Dune II</div></div>
+          <div class="mini"><div class="mp" style="background:linear-gradient(160deg,#f2c14e,#c99a2e)">📺</div><div class="ml">Severance</div></div>
+          <div class="mini"><div class="mp" style="background:linear-gradient(160deg,#45c2cf,#2b8791)">🎞️</div><div class="ml">Shōgun</div></div>
+          <div class="mini"><div class="mp" style="background:linear-gradient(160deg,#8a82a0,#5f5975);color:#fff">🎬</div><div class="ml">Past Lives</div></div>
+        </div>
+
+        <div class="sl">Because you loved The Bear</div>
+        <div class="card">
+          <div class="poster p3">🍳</div>
+          <div class="cbody">
+            <div class="t">Boiling Point</div>
+            <div class="m">Film · 2021 · 1h 32m</div>
+            <div class="stars"><span style="color:var(--muted);font-size:11px;font-weight:600">Not rated yet</span></div>
+            <span class="pill" style="background:var(--sunken);color:var(--text)">❤ Watchlist</span>
+          </div>
+        </div>
+
+        <div class="nav">
+          <span class="ni on">🏠<span class="lbl">Home</span></span>
+          <span class="ni">📖<span class="lbl">Diary</span></span>
+          <span class="fab">+</span>
+          <span class="ni">👥<span class="lbl">Feed</span></span>
+          <span class="ni">😊<span class="lbl">You</span></span>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============ TITLE DETAIL ============ -->
+    <div class="frame">
+      <div class="cap">Title detail · show</div>
+      <div class="screen">
+        <div class="status"><span>9:41</span><span>􀙇 􀛨 􀛧</span></div>
+        <div class="hero">
+          <div class="backdrop">
+            <div class="bell">🔔</div>
+            <div>
+              <div class="kicker" style="color:var(--gold)">You're all caught up</div>
+              <div class="htitle">The Bear</div>
+              <div class="hmeta">2022– · Comedy-drama · ★ 4.6</div>
+            </div>
+          </div>
+          <div class="actions">
+            <div class="btn primary">✓ Watching</div>
+            <div class="btn ghost">❤ Watchlist</div>
+          </div>
+        </div>
+
+        <div class="sl">Season 3</div>
+        <div class="ep">
+          <div class="epnum done">4</div>
+          <div class="eptitle">Violet<small>Watched · you rated ★★★★½ 😭</small></div>
+          <div class="epcheck done">✓</div>
+        </div>
+        <div class="ep">
+          <div class="epnum">5</div>
+          <div class="eptitle">Children<small>Up next</small></div>
+          <div class="epcheck">○</div>
+        </div>
+        <div class="ep">
+          <div class="epnum">6</div>
+          <div class="eptitle">Napkins<small>25 min</small></div>
+          <div class="epcheck">○</div>
+        </div>
+        <div class="seasonbtn">✓ Mark whole season watched</div>
+
+        <div class="nav">
+          <span class="ni">🏠<span class="lbl">Home</span></span>
+          <span class="ni">📖<span class="lbl">Diary</span></span>
+          <span class="fab">+</span>
+          <span class="ni">👥<span class="lbl">Feed</span></span>
+          <span class="ni">😊<span class="lbl">You</span></span>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============ LOG SHEET ============ -->
+    <div class="frame">
+      <div class="cap">The bedtime log · rate + react</div>
+      <div class="screen">
+        <div class="status"><span>9:41</span><span>􀙇 􀛨 􀛧</span></div>
+        <div class="appbar"><span class="logo">tv-time</span><span class="avatar">🙂</span></div>
+        <div class="sl">Continue watching</div>
+        <div class="card" style="opacity:.5">
+          <div class="poster">🎬</div>
+          <div class="cbody"><div class="t">The Bear</div><div class="m">Season 3 · Ep 6 next</div>
+            <div class="stars">★★★★<span class="e">★</span></div></div>
+        </div>
+
+        <div class="dim"></div>
+        <div class="sheet">
+          <div class="grab"></div>
+          <h3>The Bear · S3E5</h3>
+          <div class="sub">Marked watched — how was it?</div>
+          <div class="bigstars">★★★★<span style="opacity:.35">★</span></div>
+          <div class="askmood">How'd it feel?</div>
+          <div class="moodrow">
+            <span class="moodbig on">😭</span>
+            <span class="moodbig">😱</span>
+            <span class="moodbig">🤣</span>
+            <span class="moodbig">🥹</span>
+            <span class="moodbig">😌</span>
+          </div>
+          <div class="reward">Nice — that's <b>47 episodes</b> of The Bear this year. Add S3E6 to Up Next?</div>
+          <div class="sheetcta">
+            <span class="skip">Skip</span>
+            <span class="save">Save</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</body>
+</html>

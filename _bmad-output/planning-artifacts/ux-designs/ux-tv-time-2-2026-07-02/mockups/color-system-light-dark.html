@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>tv-time-2 — Retro Technicolor system (light + dark)</title>
+<style>
+  /* ============================================================
+     tv-time-2 — "Retro Technicolor" unified system
+     Fusion of Faded Technicolor (light) + VHS Dusk (dark).
+     Shared soul: dusty-saturated poster palette, coral/magenta
+     warm accent, teal/cyan cool accent, gold star.
+
+     LIGHT tokens
+       bg        #efe9df   surface #ffffff   surface-2 #f5f0e6
+       ink       #262b2a   muted   #7e857f
+       primary   #e0654f (coral)     primary-press #c24f3b
+       cool      #2f8f88 (teal)      gold/star     #dca82e
+     DARK tokens
+       bg        #16131e   surface #211c2c   surface-2 #2a2438
+       text      #ece7f2   muted   #8a82a0
+       primary   #ec5a92 (magenta)   primary-press #d43f7b
+       cool      #45c2cf (cyan)      gold/star     #f2c14e
+     ============================================================ */
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    background: #0e0c12; color: #ece7f2; padding: 30px 16px 70px; line-height: 1.4;
+  }
+  .head { max-width: 940px; margin: 0 auto 24px; text-align: center; }
+  .head h1 { font-size: 24px; letter-spacing: -0.02em; margin-bottom: 6px; }
+  .head p { color: #a49bb5; font-size: 13.5px; }
+  .modes { max-width: 940px; margin: 0 auto; display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+  @media (max-width: 720px){ .modes { grid-template-columns: 1fr; } }
+  .mode { border-radius: 18px; overflow: hidden; border: 1px solid rgba(255,255,255,0.08); }
+  .mode-tag { font-size: 11px; text-transform: uppercase; letter-spacing: 0.1em; font-weight: 700; padding: 10px 16px; }
+
+  /* phone frame */
+  .phone { padding: 16px; }
+  .screen { border-radius: 22px; overflow: hidden; }
+  .status { height: 26px; display:flex; align-items:center; justify-content:space-between; padding: 0 16px; font-size: 11px; font-weight:600; }
+  .appbar { padding: 12px 16px 6px; display:flex; align-items:center; justify-content:space-between; }
+  .appbar .logo { font-size: 17px; font-weight: 800; letter-spacing: -0.02em; }
+  .appbar .avatar { width: 26px; height: 26px; border-radius: 999px; display:flex; align-items:center; justify-content:center; font-size: 13px; }
+  .shelf-label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; padding: 10px 16px 8px; font-weight:700; }
+
+  .card { margin: 0 16px 12px; border-radius: 14px; overflow:hidden; display:flex; }
+  .poster { width: 72px; min-height: 104px; flex-shrink:0; display:flex; align-items:flex-end; justify-content:center; font-size: 26px; padding-bottom:7px; }
+  .cbody { padding: 10px 12px; flex:1; }
+  .cbody .t { font-size: 14px; font-weight: 700; letter-spacing:-0.01em; }
+  .cbody .m { font-size: 11px; margin: 2px 0 7px; }
+  .stars { font-size: 14px; letter-spacing: 1px; }
+  .moods { display:flex; gap:5px; margin-top:8px; }
+  .mood { font-size: 12px; padding: 2px 6px; border-radius: 999px; }
+  .badge { display:inline-block; margin-top:9px; font-size:9.5px; font-weight:800; text-transform:uppercase; letter-spacing:0.05em; padding:3px 8px; border-radius:6px; }
+
+  /* watchlist chips row */
+  .row { display:flex; gap:10px; padding: 4px 16px 14px; overflow:hidden; }
+  .mini { width:56px; }
+  .mini .mp { height:78px; border-radius:10px; display:flex; align-items:flex-end; justify-content:center; font-size:18px; padding-bottom:5px; }
+  .mini .ml { font-size:9.5px; margin-top:4px; text-align:center; opacity:.8; }
+
+  /* bottom nav */
+  .nav { display:flex; align-items:center; justify-content:space-around; padding: 8px 6px 10px; }
+  .nav .ni { font-size:18px; opacity:.55; }
+  .nav .ni.on { opacity:1; }
+  .fab { width:44px; height:44px; border-radius:14px; display:flex; align-items:center; justify-content:center; font-size:22px; font-weight:700; margin-top:-16px; }
+
+  .chips { display:flex; flex-wrap:wrap; gap:6px; padding: 0 16px 16px; }
+  .chip { font-size:10px; font-weight:700; padding:5px 8px; border-radius:6px; }
+</style>
+</head>
+<body>
+  <div class="head">
+    <h1>tv-time-2 — “Retro Technicolor” · one system, two times of day</h1>
+    <p>Light = Faded Technicolor · Dark = VHS Dusk. Same layout, same soul. This is the fusion — does it read as one product?</p>
+  </div>
+
+  <div class="modes">
+
+    <!-- ========================= LIGHT ========================= -->
+    <div class="mode" style="background:#efe9df;">
+      <div class="mode-tag" style="background:#2f8f88; color:#fff;">Light · daytime</div>
+      <div class="phone">
+        <div class="screen" style="background:#efe9df; color:#262b2a; box-shadow:0 6px 24px rgba(0,0,0,0.25);">
+          <div class="status" style="color:#262b2a;"><span>9:41</span><span>● ● ●</span></div>
+          <div class="appbar">
+            <span class="logo" style="color:#e0654f;">tv-time</span>
+            <span class="avatar" style="background:#2f8f88; color:#fff;">🙂</span>
+          </div>
+
+          <div class="shelf-label" style="color:#7e857f;">Up Next</div>
+          <div class="card" style="background:#fff; box-shadow:0 2px 8px rgba(38,43,42,0.08);">
+            <div class="poster" style="background:linear-gradient(160deg,#2f8f88,#1f6660); color:#efe9df;">🎬</div>
+            <div class="cbody">
+              <div class="t">The Bear</div>
+              <div class="m" style="color:#7e857f;">S3 · Ep 4 next</div>
+              <div class="stars" style="color:#dca82e;">★★★★<span style="opacity:.28">★</span></div>
+              <div class="moods">
+                <span class="mood" style="background:#efe9df;">😭</span>
+                <span class="mood" style="background:#efe9df;">😱</span>
+              </div>
+              <span class="badge" style="background:#e0654f; color:#fff;">Continue</span>
+            </div>
+          </div>
+
+          <div class="shelf-label" style="color:#7e857f;">Your Watchlist</div>
+          <div class="row">
+            <div class="mini"><div class="mp" style="background:linear-gradient(160deg,#e0654f,#b64330);color:#fff;">🍿</div><div class="ml">Dune II</div></div>
+            <div class="mini"><div class="mp" style="background:linear-gradient(160deg,#dca82e,#b6871c);color:#fff;">📺</div><div class="ml">Severance</div></div>
+            <div class="mini"><div class="mp" style="background:linear-gradient(160deg,#2f8f88,#1f6660);color:#fff;">🎞️</div><div class="ml">Past Lives</div></div>
+            <div class="mini"><div class="mp" style="background:linear-gradient(160deg,#7e857f,#5c625d);color:#fff;">🎬</div><div class="ml">Shōgun</div></div>
+          </div>
+
+          <div class="nav" style="background:#fff; border-top:1px solid rgba(38,43,42,0.08);">
+            <span class="ni on" style="color:#e0654f;">🏠</span>
+            <span class="ni" style="color:#262b2a;">📖</span>
+            <span class="fab" style="background:#e0654f; color:#fff;">+</span>
+            <span class="ni" style="color:#262b2a;">👥</span>
+            <span class="ni" style="color:#262b2a;">😊</span>
+          </div>
+        </div>
+      </div>
+      <div class="chips">
+        <span class="chip" style="background:#e0654f;color:#fff;">primary coral</span>
+        <span class="chip" style="background:#2f8f88;color:#fff;">cool teal</span>
+        <span class="chip" style="background:#dca82e;color:#262b2a;">gold star</span>
+        <span class="chip" style="background:#fff;color:#262b2a;border:1px solid #ddd;">surface</span>
+        <span class="chip" style="background:#262b2a;color:#efe9df;">ink</span>
+      </div>
+    </div>
+
+    <!-- ========================= DARK ========================= -->
+    <div class="mode" style="background:#16131e;">
+      <div class="mode-tag" style="background:#ec5a92; color:#fff;">Dark · nighttime</div>
+      <div class="phone">
+        <div class="screen" style="background:#16131e; color:#ece7f2; box-shadow:0 6px 24px rgba(0,0,0,0.5);">
+          <div class="status" style="color:#ece7f2;"><span>9:41</span><span>● ● ●</span></div>
+          <div class="appbar">
+            <span class="logo" style="color:#ec5a92;">tv-time</span>
+            <span class="avatar" style="background:#45c2cf; color:#16131e;">🙂</span>
+          </div>
+
+          <div class="shelf-label" style="color:#8a82a0;">Up Next</div>
+          <div class="card" style="background:#211c2c;">
+            <div class="poster" style="background:linear-gradient(160deg,#45c2cf,#2b8791); color:#16131e;">🎬</div>
+            <div class="cbody">
+              <div class="t">The Bear</div>
+              <div class="m" style="color:#8a82a0;">S3 · Ep 4 next</div>
+              <div class="stars" style="color:#f2c14e;">★★★★<span style="opacity:.28">★</span></div>
+              <div class="moods">
+                <span class="mood" style="background:#16131e;border:1px solid rgba(255,255,255,0.1);">😭</span>
+                <span class="mood" style="background:#16131e;border:1px solid rgba(255,255,255,0.1);">😱</span>
+              </div>
+              <span class="badge" style="background:#ec5a92; color:#fff;">Continue</span>
+            </div>
+          </div>
+
+          <div class="shelf-label" style="color:#8a82a0;">Your Watchlist</div>
+          <div class="row">
+            <div class="mini"><div class="mp" style="background:linear-gradient(160deg,#ec5a92,#c23f76);color:#fff;">🍿</div><div class="ml">Dune II</div></div>
+            <div class="mini"><div class="mp" style="background:linear-gradient(160deg,#f2c14e,#c99a2e);color:#16131e;">📺</div><div class="ml">Severance</div></div>
+            <div class="mini"><div class="mp" style="background:linear-gradient(160deg,#45c2cf,#2b8791);color:#16131e;">🎞️</div><div class="ml">Past Lives</div></div>
+            <div class="mini"><div class="mp" style="background:linear-gradient(160deg,#8a82a0,#5f5975);color:#fff;">🎬</div><div class="ml">Shōgun</div></div>
+          </div>
+
+          <div class="nav" style="background:#211c2c; border-top:1px solid rgba(255,255,255,0.06);">
+            <span class="ni on" style="color:#ec5a92;">🏠</span>
+            <span class="ni" style="color:#ece7f2;">📖</span>
+            <span class="fab" style="background:#ec5a92; color:#fff;">+</span>
+            <span class="ni" style="color:#ece7f2;">👥</span>
+            <span class="ni" style="color:#ece7f2;">😊</span>
+          </div>
+        </div>
+      </div>
+      <div class="chips">
+        <span class="chip" style="background:#ec5a92;color:#fff;">primary magenta</span>
+        <span class="chip" style="background:#45c2cf;color:#16131e;">cool cyan</span>
+        <span class="chip" style="background:#f2c14e;color:#16131e;">gold star</span>
+        <span class="chip" style="background:#211c2c;color:#ece7f2;">surface</span>
+        <span class="chip" style="background:#ece7f2;color:#16131e;">text</span>
+      </div>
+    </div>
+
+  </div>
+</body>
+</html>

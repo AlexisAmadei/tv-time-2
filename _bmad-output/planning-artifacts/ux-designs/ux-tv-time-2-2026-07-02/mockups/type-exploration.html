@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>tv-time-2 — type pairings</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Righteous&family=Nunito+Sans:opsz,wght@6..12,400;6..12,700&family=Playfair+Display:wght@600;800&family=Inter:wght@400;600;800&family=Anton&family=Fraunces:opsz,wght@9..144,500;9..144,800&family=DM+Sans:wght@400;600;800&display=swap" rel="stylesheet">
+<style>
+  /* tv-time-2 — 4 type pairings, all on VHS Dusk dark (hero mode).
+     Palette fixed: bg #16131e surface #211c2c magenta #ec5a92 cyan #45c2cf gold #f2c14e text #ece7f2 muted #8a82a0 */
+  * { box-sizing:border-box; margin:0; padding:0; }
+  body { background:#0e0c12; color:#ece7f2; padding:28px 16px 60px;
+    font-family:"Inter",system-ui,sans-serif; line-height:1.4; }
+  .head { max-width:1000px; margin:0 auto 22px; text-align:center; }
+  .head h1 { font-size:23px; letter-spacing:-0.02em; margin-bottom:5px; }
+  .head p { color:#a49bb5; font-size:13px; }
+  .grid { max-width:1000px; margin:0 auto; display:grid; grid-template-columns:repeat(auto-fit,minmax(230px,1fr)); gap:18px; }
+  .opt { background:#16131e; border-radius:18px; overflow:hidden; border:1px solid rgba(255,255,255,0.08); }
+  .otag { font-size:11px; font-weight:800; text-transform:uppercase; letter-spacing:0.08em; padding:10px 16px; color:#16131e; }
+  .body-note { font-size:10.5px; color:#8a82a0; padding:0 16px 10px; font-family:"Inter",sans-serif; }
+  .phone { padding:0 16px 16px; }
+
+  .logo { color:#ec5a92; }
+  .appbar { display:flex; align-items:center; justify-content:space-between; padding:12px 2px 10px; }
+  .avatar { width:26px; height:26px; border-radius:999px; background:#45c2cf; color:#16131e; display:flex; align-items:center; justify-content:center; font-size:13px; }
+
+  /* big title-detail hero to feel the display face */
+  .hero { background:#211c2c; border-radius:14px; padding:14px; margin-bottom:12px; }
+  .hero .kicker { font-size:10px; text-transform:uppercase; letter-spacing:0.12em; color:#45c2cf; font-family:"Inter",sans-serif; font-weight:700; }
+  .hero .big { color:#ece7f2; line-height:1.05; margin:5px 0 6px; }
+  .hero .sub { font-size:12px; color:#8a82a0; }
+
+  .sl { font-size:10px; text-transform:uppercase; letter-spacing:0.09em; color:#8a82a0; font-weight:700; font-family:"Inter",sans-serif; margin:4px 0 8px; }
+  .card { background:#211c2c; border-radius:13px; overflow:hidden; display:flex; }
+  .poster { width:60px; min-height:86px; flex-shrink:0; background:linear-gradient(160deg,#45c2cf,#2b8791); color:#16131e; display:flex; align-items:flex-end; justify-content:center; font-size:20px; padding-bottom:6px; }
+  .cbody { padding:9px 11px; flex:1; }
+  .cbody .t { font-size:15px; color:#ece7f2; }
+  .cbody .m { font-size:10.5px; color:#8a82a0; margin:2px 0 6px; font-family:"Inter",sans-serif; }
+  .stars { font-size:13px; letter-spacing:1px; color:#f2c14e; }
+  .moods { display:flex; gap:4px; margin-top:6px; }
+  .mood { font-size:11px; padding:2px 5px; border-radius:999px; background:#16131e; border:1px solid rgba(255,255,255,0.1); }
+</style>
+</head>
+<body>
+  <div class="head">
+    <h1>tv-time-2 — type pairings (dark / hero mode)</h1>
+    <p>Display font = logo · big titles · section headings. Body font = meta &amp; UI text. Which personality fits?</p>
+  </div>
+  <div class="grid">
+
+    <!-- 1 GROOVY 70s: Righteous + Nunito Sans -->
+    <div class="opt">
+      <div class="otag" style="background:#ec5a92;">1 · Groovy 70s</div>
+      <div class="body-note">Righteous (display) + Nunito Sans (body) — rounded, warm, funky.</div>
+      <div class="phone">
+        <div class="appbar">
+          <span class="logo" style="font-family:'Righteous',cursive; font-size:22px;">tv-time</span>
+          <span class="avatar">🙂</span>
+        </div>
+        <div class="hero">
+          <div class="kicker">Now watching</div>
+          <div class="big" style="font-family:'Righteous',cursive; font-size:26px;">The Bear</div>
+          <div class="sub" style="font-family:'Nunito Sans',sans-serif;">Season 3 · a stressful, beautiful kitchen</div>
+        </div>
+        <div class="sl">Up Next</div>
+        <div class="card">
+          <div class="poster">🎬</div>
+          <div class="cbody">
+            <div class="t" style="font-family:'Righteous',cursive; font-size:14px;">Severance</div>
+            <div class="m" style="font-family:'Nunito Sans',sans-serif;">S1 · Ep 6 next</div>
+            <div class="stars">★★★★<span style="opacity:.28">★</span></div>
+            <div class="moods"><span class="mood">😱</span><span class="mood">🤯</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 2 MARQUEE SERIF: Playfair Display + Inter -->
+    <div class="opt">
+      <div class="otag" style="background:#45c2cf;">2 · Marquee Serif</div>
+      <div class="body-note">Playfair Display (display) + Inter (body) — elegant old-cinema.</div>
+      <div class="phone">
+        <div class="appbar">
+          <span class="logo" style="font-family:'Playfair Display',serif; font-weight:800; font-size:23px;">tv-time</span>
+          <span class="avatar">🙂</span>
+        </div>
+        <div class="hero">
+          <div class="kicker">Now watching</div>
+          <div class="big" style="font-family:'Playfair Display',serif; font-weight:800; font-size:27px;">The Bear</div>
+          <div class="sub">Season 3 · a stressful, beautiful kitchen</div>
+        </div>
+        <div class="sl">Up Next</div>
+        <div class="card">
+          <div class="poster">🎬</div>
+          <div class="cbody">
+            <div class="t" style="font-family:'Playfair Display',serif; font-weight:700; font-size:15px;">Severance</div>
+            <div class="m">S1 · Ep 6 next</div>
+            <div class="stars">★★★★<span style="opacity:.28">★</span></div>
+            <div class="moods"><span class="mood">😱</span><span class="mood">🤯</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 3 VHS CHUNKY: Anton + Inter -->
+    <div class="opt">
+      <div class="otag" style="background:#f2c14e;">3 · VHS Chunky</div>
+      <div class="body-note">Anton (display) + Inter (body) — tall, bold, tape-label poster energy.</div>
+      <div class="phone">
+        <div class="appbar">
+          <span class="logo" style="font-family:'Anton',sans-serif; font-size:24px; letter-spacing:0.02em; text-transform:lowercase;">tv-time</span>
+          <span class="avatar">🙂</span>
+        </div>
+        <div class="hero">
+          <div class="kicker">Now watching</div>
+          <div class="big" style="font-family:'Anton',sans-serif; font-size:30px; letter-spacing:0.01em; text-transform:uppercase;">The Bear</div>
+          <div class="sub">Season 3 · a stressful, beautiful kitchen</div>
+        </div>
+        <div class="sl">Up Next</div>
+        <div class="card">
+          <div class="poster">🎬</div>
+          <div class="cbody">
+            <div class="t" style="font-family:'Anton',sans-serif; font-size:16px; text-transform:uppercase; letter-spacing:0.01em;">Severance</div>
+            <div class="m">S1 · Ep 6 next</div>
+            <div class="stars">★★★★<span style="opacity:.28">★</span></div>
+            <div class="moods"><span class="mood">😱</span><span class="mood">🤯</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 4 COZY CHARACTERFUL: Fraunces + DM Sans -->
+    <div class="opt">
+      <div class="otag" style="background:#e0654f;">4 · Cozy Characterful</div>
+      <div class="body-note">Fraunces (display) + DM Sans (body) — soft characterful serif, modern-vintage.</div>
+      <div class="phone">
+        <div class="appbar">
+          <span class="logo" style="font-family:'Fraunces',serif; font-weight:800; font-size:23px; font-optical-sizing:auto;">tv-time</span>
+          <span class="avatar">🙂</span>
+        </div>
+        <div class="hero">
+          <div class="kicker">Now watching</div>
+          <div class="big" style="font-family:'Fraunces',serif; font-weight:800; font-size:27px;">The Bear</div>
+          <div class="sub" style="font-family:'DM Sans',sans-serif;">Season 3 · a stressful, beautiful kitchen</div>
+        </div>
+        <div class="sl">Up Next</div>
+        <div class="card">
+          <div class="poster">🎬</div>
+          <div class="cbody">
+            <div class="t" style="font-family:'Fraunces',serif; font-weight:700; font-size:15px;">Severance</div>
+            <div class="m" style="font-family:'DM Sans',sans-serif;">S1 · Ep 6 next</div>
+            <div class="stars">★★★★<span style="opacity:.28">★</span></div>
+            <div class="moods"><span class="mood">😱</span><span class="mood">🤯</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</body>
+</html>

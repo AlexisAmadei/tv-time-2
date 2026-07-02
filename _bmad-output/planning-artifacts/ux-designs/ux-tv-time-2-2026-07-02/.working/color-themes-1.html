@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>tv-time-2 — Vintage Color Directions</title>
+<style>
+  /* ============================================================
+     tv-time-2 — 5 vintage color directions
+     Each block documents concrete hex values for lifting.
+     ============================================================ */
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    background: #1c1917; color: #e7e5e4; padding: 32px 16px 80px;
+    line-height: 1.4;
+  }
+  .page-head { max-width: 1100px; margin: 0 auto 28px; text-align: center; }
+  .page-head h1 { font-size: 26px; letter-spacing: -0.02em; margin-bottom: 6px; }
+  .page-head p { color: #a8a29e; font-size: 14px; }
+  .grid {
+    max-width: 1100px; margin: 0 auto;
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 20px;
+  }
+  .theme {
+    border-radius: 16px; overflow: hidden;
+    border: 1px solid rgba(255,255,255,0.08);
+    display: flex; flex-direction: column;
+  }
+  .theme-head { padding: 14px 16px 12px; }
+  .theme-head .name { font-size: 17px; font-weight: 700; letter-spacing: -0.01em; }
+  .theme-head .register { font-size: 12.5px; opacity: 0.8; margin-top: 3px; }
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; padding: 0 16px 14px; }
+  .chip {
+    font-size: 10px; font-weight: 600; padding: 5px 8px; border-radius: 6px;
+    border: 1px solid rgba(0,0,0,0.15); display: flex; flex-direction: column; gap: 2px;
+    min-width: 54px;
+  }
+  .chip small { font-weight: 400; opacity: 0.7; font-size: 9px; }
+  /* ---- realistic app snippet ---- */
+  .snippet { padding: 16px; flex: 1; }
+  .snip-label { font-size: 10px; text-transform: uppercase; letter-spacing: 0.08em; opacity: 0.65; margin-bottom: 10px; }
+  .card {
+    border-radius: 14px; overflow: hidden; display: flex; gap: 0;
+  }
+  .poster {
+    width: 84px; min-height: 118px; flex-shrink: 0;
+    display: flex; align-items: flex-end; justify-content: center;
+    font-size: 30px; padding-bottom: 8px;
+  }
+  .card-body { padding: 12px 14px; flex: 1; }
+  .card-body .cb-title { font-size: 15px; font-weight: 700; letter-spacing: -0.01em; }
+  .card-body .cb-meta { font-size: 11.5px; opacity: 0.7; margin: 2px 0 8px; }
+  .stars { font-size: 15px; letter-spacing: 1px; }
+  .moods { display: flex; gap: 5px; margin-top: 9px; }
+  .mood {
+    font-size: 13px; padding: 3px 7px; border-radius: 999px;
+    border: 1px solid rgba(0,0,0,0.12);
+  }
+  .watched {
+    display: inline-block; margin-top: 10px; font-size: 10px; font-weight: 700;
+    text-transform: uppercase; letter-spacing: 0.06em; padding: 3px 8px; border-radius: 6px;
+  }
+</style>
+</head>
+<body>
+  <div class="page-head">
+    <h1>tv-time-2 — Vintage Color Directions</h1>
+    <p>Cozy · chill · vintage. Same card in every palette — react to the <em>feeling</em>. Hex values are in the source comments.</p>
+  </div>
+  <div class="grid">
+
+    <!-- ============ 1. WARM PAPER ============
+         bg #f4 ead2  surface #fffaf0  ink #3a2f27  primary #b23a2f (faded red)
+         accent #c98a1e (ochre)  muted #8a7a6a  star #c9992e
+    -->
+    <div class="theme" style="background:#f4ead2; color:#3a2f27;">
+      <div class="theme-head">
+        <div class="name">1 · Warm Paper</div>
+        <div class="register">Almanac / old paperback. Cream, ink brown, a faded-red stamp. The coziest, most "print" of the set.</div>
+      </div>
+      <div class="chips">
+        <span class="chip" style="background:#fffaf0;color:#3a2f27;">BG<small>#F4EAD2</small></span>
+        <span class="chip" style="background:#3a2f27;color:#f4ead2;">Ink<small>#3A2F27</small></span>
+        <span class="chip" style="background:#b23a2f;color:#fff;">Primary<small>#B23A2F</small></span>
+        <span class="chip" style="background:#c98a1e;color:#3a2f27;">Accent<small>#C98A1E</small></span>
+        <span class="chip" style="background:#8a7a6a;color:#fff;">Muted<small>#8A7A6A</small></span>
+      </div>
+      <div class="snippet">
+        <div class="snip-label">Home · Up Next</div>
+        <div class="card" style="background:#fffaf0; box-shadow:0 1px 0 rgba(58,47,39,0.12);">
+          <div class="poster" style="background:linear-gradient(160deg,#b23a2f,#7d2820); color:#f4ead2;">🎬</div>
+          <div class="card-body">
+            <div class="cb-title">The Bear</div>
+            <div class="cb-meta" style="color:#8a7a6a;">S3 · Ep 4 watched</div>
+            <div class="stars" style="color:#c9992e;">★★★★<span style="opacity:.3">★</span></div>
+            <div class="moods">
+              <span class="mood" style="background:#f4ead2;">😭</span>
+              <span class="mood" style="background:#f4ead2;">😱</span>
+            </div>
+            <span class="watched" style="background:#b23a2f;color:#fffaf0;">Watched</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============ 2. RETRO AMBER (dark) ============
+         bg #1f1611 (espresso)  surface #2b1f17  primary #e8a838 (amber)
+         accent #e2612f (burnt orange)  text #f3e4cf  muted #9a8266  star #ffbf47
+    -->
+    <div class="theme" style="background:#1f1611; color:#f3e4cf;">
+      <div class="theme-head">
+        <div class="name">2 · Retro Amber</div>
+        <div class="register">70s TV glow at night. Espresso dark, warm amber light. Nostalgic, calm, easy on evening eyes.</div>
+      </div>
+      <div class="chips">
+        <span class="chip" style="background:#2b1f17;color:#f3e4cf;">BG<small>#1F1611</small></span>
+        <span class="chip" style="background:#e8a838;color:#1f1611;">Primary<small>#E8A838</small></span>
+        <span class="chip" style="background:#e2612f;color:#fff;">Accent<small>#E2612F</small></span>
+        <span class="chip" style="background:#f3e4cf;color:#1f1611;">Text<small>#F3E4CF</small></span>
+        <span class="chip" style="background:#9a8266;color:#1f1611;">Muted<small>#9A8266</small></span>
+      </div>
+      <div class="snippet">
+        <div class="snip-label" style="color:#9a8266;">Home · Up Next</div>
+        <div class="card" style="background:#2b1f17;">
+          <div class="poster" style="background:linear-gradient(160deg,#e2612f,#a5401c); color:#1f1611;">🎬</div>
+          <div class="card-body">
+            <div class="cb-title">The Bear</div>
+            <div class="cb-meta" style="color:#9a8266;">S3 · Ep 4 watched</div>
+            <div class="stars" style="color:#ffbf47;">★★★★<span style="opacity:.3">★</span></div>
+            <div class="moods">
+              <span class="mood" style="background:#1f1611;border-color:rgba(255,255,255,0.1);">😭</span>
+              <span class="mood" style="background:#1f1611;border-color:rgba(255,255,255,0.1);">😱</span>
+            </div>
+            <span class="watched" style="background:#e8a838;color:#1f1611;">Watched</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============ 3. FADED TECHNICOLOR ============
+         bg #efe9df (off white)  surface #ffffff  primary #2f7d78 (dusty teal)
+         accent #e07a5f (dusty coral)  gold #dca92e  text #2c322f  muted #7e857f
+    -->
+    <div class="theme" style="background:#efe9df; color:#2c322f;">
+      <div class="theme-head">
+        <div class="name">3 · Faded Technicolor</div>
+        <div class="register">Mid-century movie poster. Dusty teal + coral + mustard on off-white. Playful, sunny, a little bolder.</div>
+      </div>
+      <div class="chips">
+        <span class="chip" style="background:#fff;color:#2c322f;">BG<small>#EFE9DF</small></span>
+        <span class="chip" style="background:#2f7d78;color:#fff;">Primary<small>#2F7D78</small></span>
+        <span class="chip" style="background:#e07a5f;color:#fff;">Accent<small>#E07A5F</small></span>
+        <span class="chip" style="background:#dca92e;color:#2c322f;">Gold<small>#DCA92E</small></span>
+        <span class="chip" style="background:#7e857f;color:#fff;">Muted<small>#7E857F</small></span>
+      </div>
+      <div class="snippet">
+        <div class="snip-label" style="color:#7e857f;">Home · Up Next</div>
+        <div class="card" style="background:#fff; box-shadow:0 2px 8px rgba(44,50,47,0.08);">
+          <div class="poster" style="background:linear-gradient(160deg,#2f7d78,#1f5854); color:#efe9df;">🎬</div>
+          <div class="card-body">
+            <div class="cb-title">The Bear</div>
+            <div class="cb-meta" style="color:#7e857f;">S3 · Ep 4 watched</div>
+            <div class="stars" style="color:#dca92e;">★★★★<span style="opacity:.3">★</span></div>
+            <div class="moods">
+              <span class="mood" style="background:#efe9df;">😭</span>
+              <span class="mood" style="background:#efe9df;">😱</span>
+            </div>
+            <span class="watched" style="background:#e07a5f;color:#fff;">Watched</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============ 4. VHS DUSK (dark) ============
+         bg #17141f (ink plum)  surface #221d2e  primary #e64c8b (faded magenta)
+         accent #3fb8c4 (cyan)  text #ece7f2  muted #8a82a0  star #f2c14e
+    -->
+    <div class="theme" style="background:#17141f; color:#ece7f2;">
+      <div class="theme-head">
+        <div class="name">4 · VHS Dusk</div>
+        <div class="register">80s tape nostalgia. Ink-plum night, faded magenta + cyan neon glow. The most stylized / youthful.</div>
+      </div>
+      <div class="chips">
+        <span class="chip" style="background:#221d2e;color:#ece7f2;">BG<small>#17141F</small></span>
+        <span class="chip" style="background:#e64c8b;color:#fff;">Primary<small>#E64C8B</small></span>
+        <span class="chip" style="background:#3fb8c4;color:#17141f;">Accent<small>#3FB8C4</small></span>
+        <span class="chip" style="background:#ece7f2;color:#17141f;">Text<small>#ECE7F2</small></span>
+        <span class="chip" style="background:#8a82a0;color:#17141f;">Muted<small>#8A82A0</small></span>
+      </div>
+      <div class="snippet">
+        <div class="snip-label" style="color:#8a82a0;">Home · Up Next</div>
+        <div class="card" style="background:#221d2e;">
+          <div class="poster" style="background:linear-gradient(160deg,#e64c8b,#3fb8c4); color:#17141f;">🎬</div>
+          <div class="card-body">
+            <div class="cb-title">The Bear</div>
+            <div class="cb-meta" style="color:#8a82a0;">S3 · Ep 4 watched</div>
+            <div class="stars" style="color:#f2c14e;">★★★★<span style="opacity:.3">★</span></div>
+            <div class="moods">
+              <span class="mood" style="background:#17141f;border-color:rgba(255,255,255,0.12);">😭</span>
+              <span class="mood" style="background:#17141f;border-color:rgba(255,255,255,0.12);">😱</span>
+            </div>
+            <span class="watched" style="background:#e64c8b;color:#fff;">Watched</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============ 5. OLD CINEMA ============
+         bg #ece3d4 (ecru)  surface #f7f1e6  primary #7c2b2b (burgundy)
+         accent #b08d4f (brass)  text #2a2320  muted #8b7f70  star #b08d4f
+    -->
+    <div class="theme" style="background:#ece3d4; color:#2a2320;">
+      <div class="theme-head">
+        <div class="name">5 · Old Cinema</div>
+        <div class="register">Marquee & film noir. Ecru, deep burgundy, brass. Grown-up, elegant, "serious cinephile" cozy.</div>
+      </div>
+      <div class="chips">
+        <span class="chip" style="background:#f7f1e6;color:#2a2320;">BG<small>#ECE3D4</small></span>
+        <span class="chip" style="background:#7c2b2b;color:#fff;">Primary<small>#7C2B2B</small></span>
+        <span class="chip" style="background:#b08d4f;color:#2a2320;">Brass<small>#B08D4F</small></span>
+        <span class="chip" style="background:#2a2320;color:#ece3d4;">Text<small>#2A2320</small></span>
+        <span class="chip" style="background:#8b7f70;color:#fff;">Muted<small>#8B7F70</small></span>
+      </div>
+      <div class="snippet">
+        <div class="snip-label" style="color:#8b7f70;">Home · Up Next</div>
+        <div class="card" style="background:#f7f1e6; box-shadow:0 1px 0 rgba(42,35,32,0.12);">
+          <div class="poster" style="background:linear-gradient(160deg,#7c2b2b,#511a1a); color:#ece3d4;">🎬</div>
+          <div class="card-body">
+            <div class="cb-title">The Bear</div>
+            <div class="cb-meta" style="color:#8b7f70;">S3 · Ep 4 watched</div>
+            <div class="stars" style="color:#b08d4f;">★★★★<span style="opacity:.3">★</span></div>
+            <div class="moods">
+              <span class="mood" style="background:#ece3d4;">😭</span>
+              <span class="mood" style="background:#ece3d4;">😱</span>
+            </div>
+            <span class="watched" style="background:#7c2b2b;color:#f7f1e6;">Watched</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</body>
+</html>
