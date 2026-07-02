@@ -124,7 +124,7 @@ Soft, poster-like corners. `rounded/sm` (8px) for chips, inputs, badges; `rounde
 - **Poster** — `rounded/md` thumbnail from TMDB. While loading or when art is missing, a cool→dark gradient placeholder with a small glyph. Never a broken-image state.
 - **Title card** — poster left; title (`card-title`, Fraunces), meta (`meta`), star row, mood chips right. `surface-raised`. Tap → title detail.
 - **Star rating** — 5 stars, half-step, `gold`. Empty portion at 28% opacity. The one place gold appears.
-- **Mood chip** — `pill`, a single emoji from the curated set (😭 cried · 😱 shook · 🤣 laughed · 🥹 touched · 😌 satisfied). Selected chips fill `surface-sunken`.
+- **Mood chip** — `pill`, a single emoji from the **locked v1 set** (FR18): 😭 moved · 😂 funny · 😱 shocked · 🥰 loved it · 🤯 mind-blown · 😴 boring · 😬 cringe · 🔥 thrilling. Multi-select (0–2 typical). Selected chips fill `surface-sunken`.
 - **Fast-add (+)** — center nav slot, `primary` fill, `rounded/md`, lifted −16px. The one-tap entry to log/search.
 - **Watched badge / Continue pill** — `rounded/sm`, `primary` fill, uppercase `label`.
 - **Bottom nav** — 5 slots (Home · Diary · (+) · Feed · Profile), `surface-raised`, hairline top. Active icon in `primary`; inactive in ink at ~55% opacity.

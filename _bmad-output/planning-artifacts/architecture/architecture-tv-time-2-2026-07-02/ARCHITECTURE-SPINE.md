@@ -4,7 +4,7 @@ type: architecture-spine
 purpose: build-substrate
 altitude: feature           # keeps the epics/stories that follow this PRD coherent
 paradigm: 'BaaS-core with RLS-as-authorization'
-scope: 'TV Time 2 v1 — the full product: mobile client, self-hosted backend, data model, notification and import pipelines.'
+scope: 'TV Time 2 v1 — the full product: mobile client, self-hosted backend, data model, and the notification pipeline.'
 status: final
 created: '2026-07-02'
 updated: '2026-07-02'
@@ -22,7 +22,7 @@ companions: []
 
 ## Design Paradigm
 
-**BaaS-core, RLS-as-authorization.** Postgres is the single source of truth *and* the authorization boundary — Row-Level Security policies implement the private-by-default visibility model (FR29/FR29a), never an app-code check. PostgREST auto-generates CRUD over RLS-protected tables; GoTrue owns identity; Edge Functions are the **only** home for logic that cannot be expressed as RLS-guarded CRUD (catalog proxy/cache, TV Time import, notification poller/fan-out, GDPR export/delete). The Expo/React Native client is feature-modular — one module per bottom-nav tab (Home, Diary, Add, Feed, Profile) — and never talks to Postgres or any third party directly: only through `supabase-js` CRUD calls or typed Edge Function calls.
+**BaaS-core, RLS-as-authorization.** Postgres is the single source of truth *and* the authorization boundary — Row-Level Security policies implement the private-by-default visibility model (FR29/FR29a), never an app-code check. PostgREST auto-generates CRUD over RLS-protected tables; GoTrue owns identity; Edge Functions are the **only** home for logic that cannot be expressed as RLS-guarded CRUD (catalog proxy/cache, notification poller/fan-out, GDPR export/delete). The Expo/React Native client is feature-modular — one module per bottom-nav tab (Home, Diary, Add, Feed, Profile) — and never talks to Postgres or any third party directly: only through `supabase-js` CRUD calls or typed Edge Function calls.
 
 ```mermaid
 graph LR
@@ -50,13 +50,13 @@ graph LR
 
 ### AD-1 — Authorization lives in Postgres RLS, not app code
 
-- **Binds:** all tables with an actor FK to `auth.users` — including but not limited to `watches`, `watchlist_items`, `notify_bells`, `lists`, `list_items`, `profiles`, `tracked_shows`, `push_devices`, `imports`, `follows`. No table is exempt by omission from this list.
+- **Binds:** all tables with an actor FK to `auth.users` — including but not limited to `watches`, `watchlist_items`, `notify_bells`, `lists`, `list_items`, `profiles`, `tracked_shows`, `push_devices`, `follows`. No table is exempt by omission from this list.
 - **Prevents:** a client or Edge Function shortcut that checks visibility in TypeScript and silently diverges from what PostgREST actually returns to a different caller; also prevents an implementer reading a short Binds list as exhaustive and skipping RLS on a table not named there.
 - **Rule:** every such table carries `owner_id` (or, where there are multiple actor columns, e.g. `follows.follower_id`/`follows.followee_id`, RLS references whichever column(s) determine visibility for that table) + a nullable per-row `visibility` override on owner-scoped content tables. RLS `SELECT` policy: `owner_id = auth.uid() OR (EXISTS follow-edge AND effective_visibility = 'shared')`, where `effective_visibility` = row override if set, else the owner's `profiles.share_activity` global toggle (default off). `INSERT`/`UPDATE`/`DELETE` policies mirror the owner check (`owner_id = auth.uid()`) — no v1 flow lets a non-owner mutate another user's row. No table is exposed through PostgREST without an explicit RLS policy — deny by default. **Scope note (FR31):** this formula covers *personal-activity* visibility (watches/ratings/moods/notes) and blanket follower-visibility for lists; it does not model FR31's "shared lists" as selective per-recipient sharing — v1 lists are private-or-follower-visible only, same mechanism as everything else (see Deferred for selective recipients).
 
 ### AD-2 — Edge Functions are the only home for custom logic
 
-- **Binds:** catalog access (FR6-9), notification fan-out (FR33-37), TV Time import (FR38-41), GDPR export/delete (FR4/FR5)
+- **Binds:** catalog access (FR6-9), notification fan-out (FR33-37), GDPR export/delete (FR4/FR5)
 - **Prevents:** business logic leaking into the client (which would need the TMDB key or admin DB rights it must never hold) or into ad hoc SQL triggers that are hard to test and version.
 - **Rule:** any behavior that isn't plain RLS-guarded CRUD is a named Edge Function in `supabase/functions/`. The client and pg_cron are the only two callers of Edge Functions; Edge Functions are the only code path with the TMDB key, push credentials, or cross-user DB access.
 
@@ -84,11 +84,10 @@ graph LR
 - **Prevents:** shipping the TMDB key in the open-source F-Droid client binary, and hammering TMDB on every keystroke.
 - **Rule:** the client calls only `catalog-search`/`catalog-title`; these functions hold the TMDB key server-side, read/write `catalog_cache` (`tmdb_id`, `media_type`, `payload jsonb`, `fetched_at`) with a TTL, and are the sole callers of the external catalog. `catalog_cache` is disposable and freely evictable — it exists only to make repeat lookups fast, never as a system-of-record. It is a **different table** from AD-5's `known_episode_state`, which the notification poller owns for its own durability needs; nothing else may read or evict `known_episode_state`.
 
-### AD-7 — TV Time import is idempotent by database constraint, not app logic `[ADOPTED]`
+### AD-7 — TV Time import idempotency — RETIRED (2026-07-02)
 
-- **Binds:** `import-tvtime` Edge Function, `watches`, `tracked_shows` (FR38-FR41)
-- **Prevents:** a re-run or partial retry duplicating or clobbering history — the one hard requirement (FR40) on the whole import path.
-- **Rule:** `watches` carries a unique constraint on `(user_id, tmdb_id, tmdb_episode_id, source_watch_id)` (matching the identifier shape in Consistency Conventions — no locally-invented id column). The importer always upserts against that constraint; it never fabricates a missing timestamp — rows without a source date are inserted with `watched_at = null` and an `approximate = true` flag instead. Every imported watch against a tracked show calls the same `advance_next_episode_pointer` path as organic logging (AD-10) — import is not exempt from keeping `tracked_shows` correct.
+- **Status:** Cut with the TV Time import feature (FR38–41 out of v1 — see PRD). No `import-tvtime` function, no `source_watch_id` column, and no import unique-constraint exist in v1. The number is kept to preserve AD-8…AD-13 references.
+- **If revived post-v1:** idempotent upsert keyed on a stable `(user, title, episode, source-id)` tuple, never fabricating timestamps (missing source date → `watched_at = null` + `approximate = true`). Reintroduce as a fresh AD then.
 
 ### AD-8 — GDPR export/delete are dedicated, structurally-cascading Edge Functions
 
@@ -104,9 +103,9 @@ graph LR
 
 ### AD-10 — The next-episode pointer is derived, single-writer, never client-computed
 
-- **Binds:** `tracked_shows.next_episode_pointer`, organic watch commits (FR11), `import-tvtime` (FR38-41)
-- **Prevents:** two independently-correct-looking writers (a client that computes-and-PATCHes the pointer directly, and a future import/rewatch path that also touches it) silently disagreeing — in particular, imported watches populating `watches` but leaving a stale pointer with no error surface.
-- **Rule:** `next_episode_pointer` advancement happens through exactly one path: a Postgres function (`advance_next_episode_pointer(user_id, tmdb_id)`) exposed as a PostgREST RPC. The client calls this RPC — it never issues a raw `PATCH` against `tracked_shows.next_episode_pointer`. `import-tvtime` calls the same function for every imported watch that touches a tracked show. There is no second computation of "what's next."
+- **Binds:** `tracked_shows.next_episode_pointer`, organic watch commits (FR11), the rewatch/edit recompute path (FR16)
+- **Prevents:** two independently-correct-looking writers (a client that computes-and-PATCHes the pointer directly, and the rewatch/edit recompute path that also touches it) silently disagreeing — in particular, a watch mutation populating `watches` but leaving a stale pointer with no error surface.
+- **Rule:** `next_episode_pointer` advancement happens through exactly one path: a Postgres function (`recompute_next_episode_pointer(user_id, tmdb_id)`, derive-from-full-watch-set, not a monotonic increment) exposed as a PostgREST RPC. The client calls this RPC — it never issues a raw `PATCH` against `tracked_shows.next_episode_pointer`. The same function serves both organic advance (log) and recompute-after-delete (edit/remove, FR16), and is idempotent under retry. There is no second computation of "what's next."
 
 ### AD-11 — GDPR hosting jurisdiction is EU/EEA, not left implicit
 
@@ -131,7 +130,7 @@ graph LR
 | Concern | Convention |
 | --- | --- |
 | Naming (entities, files, interfaces, events) | Postgres tables/columns: `snake_case` (PostgREST default). TS client/Edge Function code: `camelCase`. **Catalog identifiers (binding — no table invents an alternate name):** every table referencing a catalog title/show/movie uses the column name `tmdb_id`, with a `media_type` (`'movie' \| 'tv'`) discriminator where ambiguous; a table needing episode-level granularity (only `watches`) additionally carries a nullable `tmdb_episode_id` (null for films). Never `tmdb_show_id`, `mapped_title_or_episode_id`, or any other synonym. Edge Function names are verb-first (`catalog-search`, `poll-new-episodes`, `export-my-data`). |
-| Data & formats (ids, dates, error shapes, envelopes) | Ids: `uuid` (`gen_random_uuid()`) on every owned entity. Timestamps: `timestamptz`, UTC, ISO 8601 at the API boundary. Rating: `smallint` half-steps (0–10 = 0–5★). Moods: `text[]` constrained by a Postgres **check constraint** (not an `ENUM` type — the mood set is still product-contested per Open Question #5, and a `text[]`+`CHECK` is trivially migratable in both directions where a Postgres `ENUM` is not) — never validated only in client code. Errors: PostgREST/GoTrue's default `{message, code, details}` JSON envelope; Edge Functions must emit the same shape. |
+| Data & formats (ids, dates, error shapes, envelopes) | Ids: `uuid` (`gen_random_uuid()`) on every owned entity. Timestamps: `timestamptz`, UTC, ISO 8601 at the API boundary. Rating: `smallint` half-steps (0–10 = 0–5★). Moods: `text[]` constrained by a Postgres **check constraint** (not an `ENUM` type). The v1 mood set is **LOCKED** (OQ#5 resolved) to FR18's 8 chips; `text[]`+`CHECK` is still preferred over `ENUM` so the set stays trivially migratable in both directions if it ever changes — never validated only in client code. Errors: PostgREST/GoTrue's default `{message, code, details}` JSON envelope; Edge Functions must emit the same shape. |
 | State & cross-cutting (mutation, errors, logging, config, auth) | All mutation goes through PostgREST (RLS-guarded) or an Edge Function — the client never gets a service-role key. Auth: GoTrue JWT bearer on every request; Edge Functions verify it via the Supabase auth helper, never trust an unsigned user id. Config: `.env` on the VPS, never committed; `.env.example` tracked in `supabase/`. Logging: Docker-captured stdout/stderr from each service; no separate log aggregator in v1. |
 
 ## Stack
@@ -172,7 +171,6 @@ tv-time-2/
     functions/
       catalog-search/
       catalog-title/
-      import-tvtime/
       poll-new-episodes/
       export-my-data/
       delete-my-account/
@@ -214,7 +212,6 @@ erDiagram
   PROFILES ||--o{ NOTIFY_BELLS : sets
   PROFILES ||--o{ LISTS : owns
   PROFILES ||--o{ PUSH_DEVICES : registers
-  PROFILES ||--o{ IMPORTS : runs
   PROFILES }o--o{ PROFILES : follows
   LISTS ||--o{ LIST_ITEMS : contains
 ```
@@ -229,13 +226,13 @@ Two supporting tables are intentionally not FK'd into this graph — neither is 
 | --- | --- | --- |
 | Accounts & Identity (FR1-5) | GoTrue, `profiles`, `export-my-data`/`delete-my-account` | AD-8, AD-12 |
 | Catalog & Search (FR6-9) | `catalog-search`/`catalog-title` Edge Functions, `catalog_cache` | AD-6 |
-| Tracking & Logging (FR10-16) | `watches`, `tracked_shows`, `advance_next_episode_pointer` RPC, client outbox | AD-3, AD-4, AD-10 |
+| Tracking & Logging (FR10-16) | `watches`, `tracked_shows`, `recompute_next_episode_pointer` RPC, client outbox | AD-3, AD-4, AD-10 |
 | Rating & Reaction (FR17-21) | `watches` columns | AD-3, AD-4 |
 | Diary & Profile (FR22-24) | `watches`/`profiles` read via PostgREST + RLS | AD-1 |
 | Watchlist (FR25-26) | `watchlist_items` | AD-1 |
 | Community / Social (FR27-32) | `follows`, `lists`, `list_items`, RLS visibility | AD-1, AD-8 |
 | Notifications (FR33-37) | `notify_bells`, `push_devices`, `known_episode_state`, `poll-new-episodes` + pg_cron | AD-5 |
-| TV Time Import (FR38-41) | `import-tvtime`, `watches` unique constraint | AD-7, AD-10 |
+| ~~TV Time Import (FR38-41)~~ | **Cut from v1** (see PRD) — no `import-tvtime`, no import constraint | ~~AD-7~~ (retired) |
 | Recommendations (FR42) | optional heuristic, not on the critical path | Deferred |
 | Navigation & Interaction (FR43-45) | client feature-module structure | Design Paradigm |
 | GDPR / hosting compliance (NFR6) | production VPS region | AD-11 |
@@ -244,8 +241,7 @@ Two supporting tables are intentionally not FK'd into this graph — neither is 
 
 - **F-Droid UnifiedPush wiring** — `expo-unified-push` config-plugin integration, the "no distributor installed" degraded UX (FR37), and the F-Droid build-variant CI setup are a hands-on spike at build time, not an architecture-level call.
 - **OQ#11 — TMDB licensing + fallback catalog** — needs the creator to actually verify TMDB's terms/F-Droid compatibility and name a fallback (Trakt/TVDB/Wikidata) with a switch trigger. Architecture only requires that catalog access stays behind the `catalog-search`/`catalog-title` boundary (AD-6), so swapping the provider later doesn't touch the client.
-- **TV Time export field mapping (FR39)** — the do-now export inspection (PRD Open Question #2) determines exactly what `import-tvtime` maps; the function's *shape* (idempotent upsert, never-fabricate-dates) is fixed by AD-7, the field-by-field mapping is not.
-- **Mood chip canonical set (FR18 vs DESIGN.md contradiction, PRD Open Question #5)** — a product/UX decision, not architectural; the schema only requires an extensible, migration-controlled `text[]` + `CHECK` constraint (see Consistency Conventions), not a specific set.
+- ~~**Mood chip canonical set (OQ#5)**~~ — **RESOLVED (2026-07-02):** locked to FR18's 8 chips; `DESIGN.md` reconciled. Schema unchanged (`text[]` + `CHECK`); no longer deferred.
 - **Staging environment** — not worth the ops overhead for a solo maintainer at v1 scale; revisit if community contributors start landing riskier changes.
 - **Per-entry visibility override UI** — the schema supports it now (AD-1's nullable per-row override), but whether v1 ships UI for it beyond the global toggle is a UX/epics scope call, not an architecture one.
 - **Selective (per-recipient) list sharing (FR31)** — AD-1's visibility formula covers private-or-follower-visible only; a `list_shares(list_id, shared_with_user_id)` join table for sharing with specific people rather than all followers is a real but separable extension, deferred until product confirms v1 needs it.

@@ -60,8 +60,6 @@ TMDB (or any keyed catalog) **cannot embed its API key in an open-source, reprod
 - Next-episode pointer per (user, tracked show).
 - Social graph (follow edges), feed (fan-out vs read-time aggregation — scale is small, read-time likely fine), shared lists (list + membership + visibility).
 
-## Import (TV Time) — spike notes
+## Import (TV Time) — CUT from v1 (2026-07-02)
 
-- Export format **not yet inspected**. Before writing the importer: obtain a real export, catalog its fields, and map to the watch/rating/mood/date model. Treat import fidelity as bounded by what the export contains; report unmapped data to the user (FR41) rather than silently dropping it. **The importer never fabricates timestamps** (FR39): missing dates → flagged undated/approximate, not invented.
-- ⚠️ **Do-now, not just "before build" (C2):** *saving* an export is not enough — **inspect** it before **2026-07-15** to confirm it carries per-watch dates and (ideally) ratings/moods. After that date no better export is obtainable, and the temporal-feeling thesis (FR15/FR20) is only as good as the imported data. This gates the FR39 mapping and is Open Question #2.
-- Idempotency (FR40, hard req): key identity on a stable (title, episode, source-id/timestamp) tuple so re-import never duplicates or clobbers.
+~~Spike notes for the TV Time importer.~~ **Import (FR38–41) was cut from v1**: no usable TV Time export was obtained before the July 15 2026 shutdown, so there is nothing to import or inspect; accounts start fresh. The former do-now export-inspection action is moot. If a **post-v1** community-supplied-export importer is ever scoped, the constraints that applied then still apply: never fabricate timestamps (missing dates → flagged approximate), report unmapped data rather than silently dropping it, and key idempotency on a stable (title, episode, source-id/timestamp) tuple.

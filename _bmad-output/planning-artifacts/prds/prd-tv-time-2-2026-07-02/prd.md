@@ -27,7 +27,7 @@ This is a **passion project, not a business**: no monetization, ever. It ships t
 **Product goals (v1)**
 1. Give heavy watchers a durable, feeling-aware record of their viewing life, and make *their copy* of that record impossible to lose (portable export, FR4).
 2. Make logging a watch + reaction effortless — seconds, not a form.
-3. Rescue existing TV Time history via import before it's gone.
+3. ~~Rescue existing TV Time history via import.~~ **[Cut from v1 — 2026-07-02]** No usable TV Time export was obtained before the July 15 2026 shutdown; import is out of v1 and accounts start fresh. (A community-supplied-export importer is a possible post-v1 thread — see Vision.)
 4. Provide a small, honest, non-algorithmic social layer among real friends.
 5. Be genuinely open — installable from stores **and** F-Droid, inspectable, forkable.
 
@@ -35,11 +35,10 @@ This is a **passion project, not a business**: no monetization, ever. It ships t
 
 **Success criteria**
 - The creator uses it **daily and enjoys it** — logging is a small pleasure, not a chore — and never defects to Letterboxd or a spreadsheet for this purpose. Delight is a first-class measure here, not just retention.
-- **Import fidelity is transparent:** the importer preserves everything the TV Time export actually contains and reports precisely what it could and couldn't map (FR41). "Nothing is silently dropped" — the honest, testable form of "no history lost." `[ASSUMPTION]` fidelity is bounded by the export (see FR38–FR41 + Open Questions).
 - Logging a watch + reaction meets the NFR1 latency bar.
 - At least a **handful of real friends** run their own accounts (validates the community bet). `[ASSUMPTION — rough target; tune to what "worth it" means.]`
 - It is **open source and installable** from stores + F-Droid.
-- *(Optional behavioral proxy, if we want an external signal beyond the creator's willpower: log-loop completion rate without abandonment, and import-completion rate.)*
+- *(Optional behavioral proxy, if we want an external signal beyond the creator's willpower: log-loop completion rate without abandonment.)*
 
 **Counter-metrics (things we refuse to optimize)**
 - Not daily-active-users at any cost: **zero** guilt/streak mechanics, **zero** "we miss you" re-engagement pushes. Engagement that isn't a genuine new episode is a failure, not a win.
@@ -72,7 +71,7 @@ FRs are grouped by capability with globally stable IDs. See the **Glossary** for
 
 ### Accounts & Identity
 - **FR1** — Users can create an account and sign in; accounts are multi-user and centrally hosted (single shared instance; self-hosting is out of v1).
-- **FR2** — A user has a profile: display name, optional avatar `[ASSUMPTION]`, and public-facing stats/favorites (see FR22–FR23), subject to the visibility model (FR29a).
+- **FR2** — A user has a profile: a unique **`@username`** (handle, set at sign-up), display name, optional avatar `[ASSUMPTION]`, and public-facing stats/favorites (see FR22–FR23), subject to the visibility model (FR29a).
 - **FR3** — Account creation and sign-in work **without any Google/Firebase dependency** in the F-Droid build (see NFR3).
 - **FR4** — A user can export their own data (watches, ratings, moods, notes, lists) in a portable format at any time, so history is never vendor-locked. `[ASSUMPTION]` JSON is the likely baseline.
 - **FR5** — A user can delete their account and all associated personal data. *(Committed — legally expected for a hosted service holding personal data; relied on by NFR6.)*
@@ -90,18 +89,18 @@ FRs are grouped by capability with globally stable IDs. See the **Glossary** for
 - **FR13** — **Bulk season log:** from a season row, a sheet pre-checks all episodes; the user deselects any and confirms once. An optional season-level rating may be applied.
 - **FR14** — Committing a watch is instant and gives a soft confirmation; it is **never** blocked by rating or by catalog latency (logs from cached episode data if needed). *(Testable: watch commits with the network disabled.)*
 - **FR15** — Each watch is **timestamped** at log time (the basis of the temporal watch-memory).
-- **FR16** — Users can edit or remove a logged watch (correct mistakes, including imported ones). *(Committed — the repair path that makes imported/mistyped history trustworthy.)*
+- **FR16** — Users can edit or remove a logged watch (correct mistakes). *(Committed — the repair path that keeps mistyped history trustworthy.)*
 
 ### Rating & Reaction
 - **FR17** — After a committed watch, a rating prompt offers a **½-step 5-star quality rating** and **mood chips**; a one-tap **Skip** is always present. Rating never blocks the watch.
-- **FR18** — **Mood chips** are a **curated set** (not free emoji), multi-select (0–2 typical), applied to the episode (shows) or the title (films). `[ASSUMPTION]` **Proposed v1 set:** 😭 moved · 😂 funny · 😱 shocked · 🥰 loved it · 🤯 mind-blown · 😴 boring · 😬 cringe · 🔥 thrilling — fixed set for v1 (see Open Question #5). This vocabulary is a hard dependency for the rating UI, feed rendering, the mood enum in the data model, and the v2 sentiment feature.
+- **FR18** — **Mood chips** are a **curated set** (not free emoji), multi-select (0–2 typical), applied to the episode (shows) or the title (films). **Locked v1 set:** 😭 moved · 😂 funny · 😱 shocked · 🥰 loved it · 🤯 mind-blown · 😴 boring · 😬 cringe · 🔥 thrilling — **Locked set for v1 (Open Question #5 resolved)**, enforced as a Postgres `text[]` + `CHECK`. This vocabulary is a hard dependency for the rating UI, feed rendering, the mood enum in the data model, and the v2 sentiment feature.
 - **FR19** — Ratings and moods are **re-tappable** — a user can change a rating/mood later.
 - **FR20** — A rating/mood is **bound to the watch's timestamp** — it records how the user felt *then*, not a single evolving score. Prior reactions on earlier watches are preserved, not overwritten.
 - **FR21** — Users can attach an optional short **note / mini-review** to a watch. `[ASSUMPTION]` ~500-char cap, plain text.
 
 ### Watch-Memory (Diary) & Profile
 - **FR22** — A **Diary** shows the user's personal history of watched titles/episodes with their ratings, moods, notes, and dates, over time.
-- **FR23** — A **Profile** (labeled **"You"** in the UI per `DESIGN.md`) shows aggregate stats (e.g. year counts of films/shows/episodes), favorites, watchlist, and friends. `[ASSUMPTION]` "favorites" and aggregate stats are derived from the user's watches; the exact aggregation rule against the multi-watch model (FR20) is defined in Open Question #10.
+- **FR23** — A **Profile** (labeled **"You"** in the UI per `DESIGN.md`) shows aggregate stats (e.g. year counts of films/shows/episodes), favorites, watchlist, and friends. "Favorites" and aggregate stats are derived from the user's watches per the rule resolved in Open Question #10: year stats = distinct-title film/show counts + raw episode-watch count; favorites = distinct titles with a max watch-rating ≥ 4.5★ (preserving the multi-watch model, FR20).
 - **FR24** — Empty states are warm and route to a first action rather than showing cold zeroes (see `EXPERIENCE.md` → State Patterns).
 
 ### Watchlist
@@ -111,11 +110,11 @@ FRs are grouped by capability with globally stable IDs. See the **Glossary** for
 ### Community / Social (light)
 - **FR27** — Users can **follow / unfollow** other users; a user has a friends/following list.
 - **FR28** — A **chronological activity feed** shows followed users' recent *visible* watches, ratings, moods, and notes. **Non-algorithmic** — reverse-chronological, never engagement-ranked.
-- **FR29** — **Privacy is private-by-default.** A user's watches, ratings, moods, and notes are visible to no one until the user explicitly opts in. Nothing imported or logged is ever exposed without an affirmative action by the owner.
+- **FR29** — **Privacy is private-by-default.** A user's watches, ratings, moods, and notes are visible to no one until the user explicitly opts in. Nothing logged is ever exposed without an affirmative action by the owner.
 - **FR29a** — **Visibility is a first-class, per-entry-capable property** in the data model (not a bolt-on). v1 exposes at least a **global "share my activity with friends" toggle** (default off); per-entry overrides may ship in v1 or later, but the schema must not preclude them. Followers only ever see entries the owner has made visible.
 - **FR30** — From a feed entry, a user can ❤️ the title to their own watchlist.
 - **FR31** — Users can create **shared lists** — named, curated collections of titles — and share them with / make them visible to friends.
-- **FR32** `[ASSUMPTION]` — A user can find/add friends (by username or share link). Discovery mechanism TBD (Open Question #6).
+- **FR32** — A user can find/add friends by **exact `@username` lookup** or a **share/deep link** — no fuzzy user browsing (preserving the private posture). Requires a unique `username` on the profile.
 - **Out of v1 scope:** comments/replies on others' entries; likes; algorithmic ranking; public global discovery.
 
 ### Notifications (the one retention lever)
@@ -125,11 +124,8 @@ FRs are grouped by capability with globally stable IDs. See the **Glossary** for
 - **FR36** — A **global notifications toggle** lives in Profile → Settings; per-title bells govern only their own title.
 - **FR37** — Push delivery uses the platform-appropriate channel per build (APNs on iOS; FCM on Play Store Android; **UnifiedPush** on the F-Droid Android build — no Google dependency there; see NFR3). When no push channel is available (e.g. an F-Droid build with no UnifiedPush distributor installed), the app **degrades gracefully**: in-app "what's new" surfaces the same new-episode info on next open, and the app does not pretend a push was delivered.
 
-### TV Time Import
-- **FR38** — Users can **import their TV Time data export** so years of history survive the shutdown.
-- **FR39** — Import maps, at minimum, **watched titles/episodes and their dates** into the timeline; ratings/moods are mapped **where the export provides them**. **The importer never fabricates data:** if the export lacks per-watch dates, those watches are flagged as *undated/approximate* rather than given invented timestamps; if it lacks ratings/moods, those are left empty for the user to fill (FR16). `[ASSUMPTION]` exact field coverage depends on the export format — see Open Question #2 (a do-now inspection, not a downstream question).
-- **FR40** — Import is **idempotent and non-destructive** (hard requirement): re-running import, or importing over existing data, must not duplicate or clobber entries. Identity is keyed on a stable (title, episode, source-id/timestamp) tuple.
-- **FR41** — Import surfaces a clear summary of what was and wasn't imported (unmapped fields, undated rows, skipped rows), so the user knows the fidelity of their rescue.
+### TV Time Import — CUT from v1 (2026-07-02)
+~~FR38–FR41~~ — **Removed from v1 scope.** No usable TV Time export was obtained before the July 15 2026 shutdown, so there is nothing to import or inspect; accounts start fresh. A community-supplied-export importer remains a possible **post-v1** thread (see Vision). Ripple: reflected in the epics, and in the architecture (AD-7, the `import-tvtime` function, and the `IMPORTS` entity are removed; the next-episode pointer has a single organic caller).
 
 ### Recommendations (v1 = optional, non-LLM)
 - **FR42** — Home *may* show a **Recommendations shelf**. For v1 this is at most a **simple, non-LLM** heuristic (e.g. recently-added or genre-adjacent) or a curated shelf; it must never block the log loop and **may ship empty/absent**. No user journey's payoff depends on it (see UJ-1). **LLM-powered recommendations are explicitly v2** (see Vision).
@@ -155,9 +151,10 @@ FRs are grouped by capability with globally stable IDs. See the **Glossary** for
 
 ## Scope
 
-**In (v1):** accounts (multi-user, hosted) · catalog search · track shows/films with progress · one-tap Watched + bulk season log · hybrid rating (½-star + mood chips) + optional notes · timestamped watch-memory (Diary) · Profile stats · Watchlist · light social (follow, chronological feed, private-by-default visibility, notes-in-feed, shared lists) · earned new-episode notifications (per-platform push channel) · **TV Time import** · optional non-LLM recommendation shelf · native **iOS + Android** (one codebase, F-Droid variant) · dark + Paper White themes.
+**In (v1):** accounts (multi-user, hosted) · catalog search · track shows/films with progress · one-tap Watched + bulk season log · hybrid rating (½-star + mood chips) + optional notes · timestamped watch-memory (Diary) · Profile stats · Watchlist · light social (follow, chronological feed, private-by-default visibility, notes-in-feed, shared lists) · earned new-episode notifications (per-platform push channel) · optional non-LLM recommendation shelf · native **iOS + Android** (one codebase, F-Droid variant) · dark + Paper White themes.
 
 **Out (v1):**
+- **TV Time import (FR38–41)** — cut from v1; no usable export was obtained before the shutdown. Accounts start fresh. A community-supplied-export importer is a possible post-v1 thread.
 - **Web** — moved to post-v1 (v1 behavior contract in `EXPERIENCE.md` is mobile-only; web has no design yet).
 - **LLM recommendations** — deferred to **v2** (the flagship v2 feature).
 - **Comments/likes on others' entries**, algorithmic feed, public global discovery — post-v1.
@@ -166,30 +163,29 @@ FRs are grouped by capability with globally stable IDs. See the **Glossary** for
 - **Proprietary Google-only dependencies in the F-Droid build** — out by constraint (NFR3).
 - **Offline optimization** beyond the basic cache/queue (NFR8).
 
-**Hard external deadline & do-now action:** TV Time deletes all user data after **July 15, 2026** (13 days out). ⚠️ **Before then — and before architecture is called "started" — the creator must not just *save* but *inspect* a TV Time export** (Open Question #2): confirm it contains per-watch dates and, ideally, ratings/moods. After July 15 no better export can ever be obtained; if the export is lossy, the temporal-feeling thesis is degraded for all migrated history and the importer's behavior (FR39) must account for it. The *build* timeline itself is relaxed (passion project); the *export inspection* is not.
+**On the July 15 2026 shutdown (historical note).** TV Time's data deletion was the founding motivation for this project. The original plan was to rescue history via import, but no usable export was obtained in time, so import was cut from v1 (see above) and accounts start fresh. The shutdown no longer gates any v1 work.
 
 ## Dependencies & Constraints
 
 - **External catalog** (TMDB or equivalent) for title/episode/poster metadata — hard runtime dependency. In an open-source/F-Droid client the API key cannot be embedded, so catalog traffic is expected to be **proxied through the backend** (adds a latency/cost chokepoint — architecture must budget it; see addendum H2). Licensing + F-Droid compatibility to verify before architecture. `[ASSUMPTION: TMDB]`
 - **F-Droid eligibility** constrains the F-Droid build's auth, push, and analytics (NFR3).
-- **TV Time export format** — unknown until inspected; gates import fidelity (FR38–FR41) and the do-now action above.
 - **Push transport** — per-platform (APNs / FCM / UnifiedPush); the F-Droid path needs a UnifiedPush distributor and graceful degradation (FR37; addendum).
 - **New-episode push is backend-intensive** — polling the catalog per notified title/user and fanning out is the heaviest v1 component on a no-budget instance; bounded cadence + stale-air-date handling to be designed (addendum H3).
 
 ## Open Questions
 
-*(Carried forward for architecture / next phase. ⭐ = should be decided at or before the start of architecture; the export inspection is do-now.)*
+*(Carried forward for architecture / next phase. ⭐ = should be decided at or before the start of architecture.)*
 
 1. ~~Privacy default~~ — **RESOLVED: private-by-default** (FR29). Remaining sub-question: does per-entry visibility ship in v1 or later? (Schema supports it either way, FR29a.)
-2. ⭐🔴 **TV Time export format — DO NOW (pre-July-15).** Inspect the actual export; confirm per-watch dates and rating/mood coverage; finalize the FR39 mapping and missing-data behavior.
+2. ~~TV Time export format (do-now)~~ — **MOOT: import cut from v1** (no usable export obtained; see Scope). Reopens only if a post-v1 community-export importer is scoped.
 3. ⭐ **Auth + push mechanism** — pick the F-Droid-compatible approach (UnifiedPush distributor strategy, self-hosted auth) since it shapes the backend and build variants from day one (addendum).
 4. ⭐ **Backend hosting & cost** — where the single instance runs, and the polling/fan-out budget for notifications (addendum H3); informs the NFR11 wind-down process.
-5. **Mood chip set** — confirm/adjust the proposed v1 set (FR18) and lock fixed-vs-extensible before building the rating component. ⚠️ **Contradiction to resolve:** `DESIGN.md` currently lists a *different* 5-emoji set (😭 cried · 😱 shook · 🤣 laughed · 🥹 touched · 😌 satisfied). **FR18 is canonical** for the mood enum; DESIGN.md must be updated to match once the set is locked.
-6. **Friend discovery** — username search vs invite/share link vs both (FR32).
+5. ~~Mood chip set~~ — **RESOLVED (2026-07-02): FR18's 8-chip set is LOCKED and fixed for v1** (😭 moved · 😂 funny · 😱 shocked · 🥰 loved it · 🤯 mind-blown · 😴 boring · 😬 cringe · 🔥 thrilling), enforced as a Postgres `text[]` + `CHECK`. `DESIGN.md` updated to match (it carried a stale 5-emoji set).
+6. ~~Friend discovery~~ — **RESOLVED (2026-07-02): both.** A unique `@username` handle (exact-match lookup only — no fuzzy browsing, preserving the private posture) **and** a share/deep link. Adds `profiles.username` (unique), captured at sign-up. See FR32.
 7. **Recommendation heuristic (v1)** — what powers the optional non-LLM shelf, or ship absent until v2 (FR42).
 8. **Data export format** for FR4 (JSON baseline?).
 9. **Note length cap / formatting** (FR21).
-10. **Profile aggregation rule** — how "favorites" and stats are derived against the multi-watch, timestamped-rating model (FR20/FR23).
+10. ~~Profile aggregation rule~~ — **RESOLVED (2026-07-02).** Year stats (by `watched_at`, user-local time): **episodes** = raw count of episode-watch rows (rewatches included); **shows** = distinct TV titles with ≥1 episode watched that year; **films** = distinct film titles watched that year. **Favorites** = distinct titles whose **max rating across all their watches ≥ 4.5★**, ordered by most-recent qualifying watch (uses max, never collapses the multi-watch Diary). See FR23.
 11. **TMDB licensing + F-Droid compatibility** confirmation, and a named fallback catalog trigger (FR6; addendum H2).
 
 ## Vision (post-v1)
@@ -209,7 +205,7 @@ If it works, TV Time 2 becomes the **durable, open home for watch-memories**. **
 - **Feed** — the reverse-chronological stream of followed users' *visible* activity.
 - **Visibility** — per-user (and schema-permitting per-entry) control over who can see a watch; **private by default**.
 - **Notify bell** — per-title toggle for genuine new-episode push alerts, independent of tracking.
-- **Import** — bringing a TV Time data export into the app.
+- **Import** *(post-v1)* — bringing an external data export into the app; cut from v1.
 - **F-Droid build** — the Google-free Android build variant (UnifiedPush, no Play Services).
 
 ## Assumptions Index
@@ -218,10 +214,7 @@ Inline `[ASSUMPTION]` tags, collected (resolve before or during architecture):
 - **FR2** — profile includes an optional avatar.
 - **FR4 / OQ#8** — export format is JSON (baseline).
 - **FR6 / OQ#11** — catalog source is TMDB (licensing/F-Droid compat unverified).
-- **FR18 / OQ#5** — the proposed v1 mood set and its fixed-vs-extensible nature.
 - **FR21 / OQ#9** — ~500-char plain-text note cap.
-- **FR23 / OQ#10** — Profile aggregation derives from watches; exact rule TBD.
-- **FR32 / OQ#6** — friend discovery mechanism.
 - **NFR6** — precise GDPR/DPA/hosting-jurisdiction details are an ops concern.
-- **Success criteria** — "handful of friends" is a rough target; import "fidelity" is bounded by the export.
+- **Success criteria** — "handful of friends" is a rough target.
 - **Users** — the tertiary open-source/privacy audience.
