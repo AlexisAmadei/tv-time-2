@@ -6,8 +6,9 @@ Types shared between the Expo client (`app/`) and the Supabase Edge Functions
 ## What lives here
 
 - **`ErrorEnvelope`** (`{ message, code, details }`) — the one error shape every
-  boundary returns (ARCH-10). PostgREST and GoTrue already return this shape;
-  Edge Functions must match it exactly.
+  boundary returns (ARCH-10). PostgREST's default errors are already close to
+  this shape; GoTrue's are not (it uses `msg`, no `details`), so upstream errors
+  are normalized to this envelope. Every Edge Function must return it exactly.
 
 ## Build-free by design
 
