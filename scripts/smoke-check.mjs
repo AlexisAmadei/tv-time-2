@@ -1,9 +1,11 @@
 #!/usr/bin/env node
-// Story 1.1 smoke check — the scripted "done" gate for the foundation.
+// Scripted "done" gate for the foundation + auth (Stories 1.1, 1.2).
 //
-// Chains the two checks the story defines:
-//   1. All six Supabase services report healthy (docker compose ps).
+// Chains the checks the stories define:
+//   1. All stack services report healthy (docker compose ps).
 //   2. The Kong gateway is reachable with the generated anon key (no silent 401).
+//   3. GoTrue exposes ONLY email auth — no OAuth provider enabled (AC3 / AD-12).
+//   4. An anonymous request to a PostgREST table is denied (AC6 / deny-by-default).
 //
 // This is NOT a test framework — a real one lands via a future
 // `testarch-framework` run. It is a fast, honest substrate check.
@@ -11,13 +13,14 @@
 // Usage: node scripts/smoke-check.mjs   (or: pnpm run verify)
 
 import { execFileSync } from 'node:child_process';
-import { readFileSync } from 'node:fs';
+import { readFileSync, existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), '..');
 const supabaseDir = join(repoRoot, 'supabase');
-const EXPECTED = ['auth', 'db', 'functions', 'kong', 'rest', 'storage'];
+const composeFile = join(supabaseDir, 'docker-compose.yml');
+const EXPECTED = ['auth', 'db', 'functions', 'kong', 'mail', 'rest', 'storage'];
 
 let failures = 0;
 const fail = (msg) => {
@@ -31,7 +34,9 @@ let psJson = '';
 try {
   psJson = execFileSync(
     'docker',
-    ['compose', '--project-directory', supabaseDir, 'ps', '--format', 'json'],
+    // Pass -f explicitly (like the package.json scripts do) so the compose file
+    // is found regardless of the cwd `verify` is run from.
+    ['compose', '-f', composeFile, '--project-directory', supabaseDir, 'ps', '--format', 'json'],
     { encoding: 'utf8' },
   );
 } catch (err) {
@@ -69,8 +74,18 @@ function parsePsJson(text) {
   }
   return text
     .split('\n')
-    .filter((l) => l.trim())
-    .map((l) => JSON.parse(l));
+    .map((l) => l.trim())
+    .filter(Boolean)
+    .map((l) => {
+      // docker/compose sometimes interleaves warning/progress lines with the
+      // NDJSON; skip anything that isn't a JSON object rather than crashing.
+      try {
+        return JSON.parse(l);
+      } catch {
+        return null;
+      }
+    })
+    .filter(Boolean);
 }
 
 // 2. Gateway reachability with the anon key -----------------------------------
@@ -83,25 +98,81 @@ function readEnvValue(file, key) {
   return quoted ? quoted[1] : value;
 }
 
-try {
-  const url = readEnvValue(join(supabaseDir, '.env'), 'API_EXTERNAL_URL') || 'http://localhost:8000';
-  const anonKey = readEnvValue(join(supabaseDir, '.env'), 'ANON_KEY');
+const envFile = join(supabaseDir, '.env');
+let baseUrl;
+let anonKey;
+if (!existsSync(envFile)) {
+  // Distinguish "secrets never generated" from a real gateway failure so the
+  // operator is pointed at the right fix instead of a misleading ENOENT.
+  fail('supabase/.env not found — run: node supabase/scripts/generate-keys.mjs, then retry.');
+} else {
+  baseUrl = readEnvValue(envFile, 'API_EXTERNAL_URL') || 'http://localhost:8000';
+  anonKey = readEnvValue(envFile, 'ANON_KEY');
   if (!anonKey) {
     fail('ANON_KEY missing from supabase/.env (run: node supabase/scripts/generate-keys.mjs).');
   } else {
-    const target = `${url}/auth/v1/health`;
-    const res = await fetch(target, {
+    try {
+      const target = `${baseUrl}/auth/v1/health`;
+      const res = await fetch(target, { headers: { apikey: anonKey }, signal: AbortSignal.timeout(5000) });
+      if (res.ok) {
+        ok(`Gateway reachable with anon key at ${target} (HTTP ${res.status}).`);
+      } else {
+        fail(`Gateway returned HTTP ${res.status} for ${target} (anon key rejected?).`);
+      }
+    } catch (err) {
+      fail(`Gateway probe failed: ${err.message}`);
+    }
+  }
+}
+
+// 3. Auth is email-only — no OAuth provider enabled (AC3 / AD-12) --------------
+if (anonKey) {
+  try {
+    const res = await fetch(`${baseUrl}/auth/v1/settings`, {
       headers: { apikey: anonKey },
       signal: AbortSignal.timeout(5000),
     });
-    if (res.ok) {
-      ok(`Gateway reachable with anon key at ${target} (HTTP ${res.status}).`);
+    const settings = await res.json();
+    const external = settings.external || {};
+    if (external.email !== true) {
+      fail('GoTrue: email auth is not enabled (expected external.email === true).');
     } else {
-      fail(`Gateway returned HTTP ${res.status} for ${target} (anon key rejected?).`);
+      const oauthOn = Object.entries(external)
+        .filter(([k, v]) => v === true && k !== 'email' && k !== 'phone' && k !== 'anonymous_users');
+      if (oauthOn.length > 0) {
+        fail(`GoTrue: OAuth provider(s) enabled — must be Google-free (${oauthOn.map(([k]) => k).join(', ')}).`);
+      } else {
+        ok('GoTrue exposes only email auth — no OAuth provider enabled.');
+      }
     }
+  } catch (err) {
+    fail(`Auth settings probe failed: ${err.message}`);
   }
-} catch (err) {
-  fail(`Gateway probe failed: ${err.message}`);
+}
+
+// 4. Deny-by-default: an anonymous request to a table is refused (AC6) ---------
+if (anonKey) {
+  try {
+    const res = await fetch(`${baseUrl}/rest/v1/profiles?select=id`, {
+      headers: { apikey: anonKey },
+      signal: AbortSignal.timeout(5000),
+    });
+    let rows = null;
+    try {
+      const body = await res.json();
+      if (Array.isArray(body)) rows = body.length;
+    } catch {
+      // non-JSON body is fine — a hard denial
+    }
+    const denied = res.status >= 400 || rows === 0;
+    if (denied) {
+      ok(`Anonymous read of /rest/v1/profiles denied (HTTP ${res.status}${rows === 0 ? ', 0 rows' : ''}).`);
+    } else {
+      fail(`Anonymous read of /rest/v1/profiles was NOT denied (HTTP ${res.status}, ${rows} rows) — RLS/grant regression.`);
+    }
+  } catch (err) {
+    fail(`Anonymous deny-by-default probe failed: ${err.message}`);
+  }
 }
 
 // Result ----------------------------------------------------------------------
@@ -109,4 +180,4 @@ if (failures > 0) {
   console.error(`\nSmoke check FAILED with ${failures} problem(s).`);
   process.exit(1);
 }
-console.log('\nSmoke check passed: all six services healthy and the gateway accepts the anon key.');
+console.log('\nSmoke check passed: stack healthy, gateway accepts the anon key, auth is email-only, and anonymous table reads are denied.');

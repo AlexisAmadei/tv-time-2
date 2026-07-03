@@ -3,10 +3,13 @@ import { useEffect, useState } from 'react';
 import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
 
 import { checkSupabaseHealth } from './data/supabaseClient';
+import { useSession } from './data/auth';
+import AuthScreen from './features/auth/AuthScreen';
+import SignedInScreen from './features/auth/SignedInScreen';
 
 type HealthState =
   | { phase: 'checking' }
-  | { phase: 'ok'; status: number }
+  | { phase: 'ok' }
   | { phase: 'error'; message: string };
 
 export default function App() {
@@ -15,8 +18,8 @@ export default function App() {
   useEffect(() => {
     let cancelled = false;
     checkSupabaseHealth()
-      .then((status) => {
-        if (!cancelled) setHealth({ phase: 'ok', status });
+      .then(() => {
+        if (!cancelled) setHealth({ phase: 'ok' });
       })
       .catch((e: Error) => {
         if (!cancelled) setHealth({ phase: 'error', message: e.message });
@@ -27,25 +30,45 @@ export default function App() {
   }, []);
 
   return (
-    <View style={styles.container}>
-      <Text style={styles.title}>TV Time 2</Text>
+    <>
       {health.phase === 'checking' && (
-        <View style={styles.row}>
+        <Centered>
           <ActivityIndicator />
           <Text style={styles.muted}>Checking Supabase connectivity…</Text>
-        </View>
+        </Centered>
       )}
-      {health.phase === 'ok' && (
-        <Text style={styles.ok}>✓ Connected to Supabase (HTTP {health.status})</Text>
+      {health.phase === 'error' && (
+        <Centered>
+          <Text style={styles.error}>✗ {health.message}</Text>
+        </Centered>
       )}
-      {health.phase === 'error' && <Text style={styles.error}>✗ {health.message}</Text>}
+      {health.phase === 'ok' && <AuthGate />}
       <StatusBar style="auto" />
-    </View>
+    </>
   );
 }
 
+// Renders the auth screen or the signed-in app depending on session state.
+// Story 1.3 replaces SignedInScreen with the themed shell + bottom navigation.
+function AuthGate() {
+  const { session, loading } = useSession();
+
+  if (loading) {
+    return (
+      <Centered>
+        <ActivityIndicator />
+      </Centered>
+    );
+  }
+  return session ? <SignedInScreen session={session} /> : <AuthScreen />;
+}
+
+function Centered({ children }: { children: React.ReactNode }) {
+  return <View style={styles.centered}>{children}</View>;
+}
+
 const styles = StyleSheet.create({
-  container: {
+  centered: {
     flex: 1,
     backgroundColor: '#fff',
     alignItems: 'center',
@@ -53,9 +76,6 @@ const styles = StyleSheet.create({
     padding: 24,
     gap: 12,
   },
-  title: { fontSize: 22, fontWeight: '600' },
-  row: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   muted: { color: '#666' },
-  ok: { color: '#137333', fontWeight: '500', textAlign: 'center' },
   error: { color: '#b00020', textAlign: 'center' },
 });

@@ -49,8 +49,8 @@ story_location: "{project-root}/_bmad-output/implementation-artifacts"
 
 development_status:
   epic-1: in-progress
-  1-1-project-foundation-boots-locally: review
-  1-2-create-an-account-and-sign-in-google-free: backlog
+  1-1-project-foundation-boots-locally: done
+  1-2-create-an-account-and-sign-in-google-free: review
   1-3-themed-app-shell-with-bottom-navigation-dark-mode: backlog
   1-4-search-a-real-title-through-the-proxied-catalog: backlog
   1-5-log-a-watch-local-first-surviving-a-network-drop: backlog

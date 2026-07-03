@@ -73,6 +73,8 @@ services:
     depends_on:
       db:
         condition: service_healthy
+      mail:
+        condition: service_started
     healthcheck:
       test:
         ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:9999/health"]
@@ -208,6 +210,22 @@ services:
       SUPABASE_DB_URL: postgresql://postgres:${POSTGRES_PASSWORD}@${POSTGRES_HOST}:${POSTGRES_PORT}/${POSTGRES_DB}
       VERIFY_JWT: "${FUNCTIONS_VERIFY_JWT}"
     command: ["start", "--main-service", "/home/deno/functions/main"]
+
+  # Local-dev mail catcher (Story 1.2). GoTrue's SMTP_HOST/PORT point here
+  # (supabase-mail:2500), so confirmation + magic-link/OTP emails are captured
+  # instead of sent. Read them at http://localhost:9000. Never runs in
+  # production (real SMTP is a launch concern). Pinned per AD-13 — never `latest`.
+  mail:
+    container_name: supabase-mail
+    image: inbucket/inbucket:3.0.3
+    restart: unless-stopped
+    ports:
+      # Web UI (loopback only — a dev tool, never exposed to the LAN/VPS).
+      - 127.0.0.1:9000:9000
+    environment:
+      # Bind SMTP to the port GoTrue expects (matches SMTP_PORT in .env).
+      INBUCKET_SMTP_ADDR: "0.0.0.0:2500"
+      INBUCKET_WEB_ADDR: "0.0.0.0:9000"
 
   kong:
     container_name: supabase-kong
