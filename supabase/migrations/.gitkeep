@@ -1,4 +1,0 @@
-# Keep this directory tracked while empty.
-# The first migration (auth-adjacent schema) lands in Story 1.2.
-# Convention: snake_case DB objects, uuid ids (gen_random_uuid()),
-# timestamptz UTC ISO 8601, ratings smallint half-steps, moods text[] + CHECK.
