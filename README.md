@@ -12,6 +12,8 @@ by design — follow friends, see their reactions, share lists — but there's n
 monetization plan, no ads, and no proprietary lock-in. It's open source and
 aimed at F-Droid distribution, so no one can take your history away again.
 
+Roadmap board: [kanban.kiwidev.fr/Kiwidev/tv-time-2](https://kanban.kiwidev.fr/Kiwidev/tv-time-2)
+
 ## Disclaimer
 
 This is an independent, unofficial fan project. I am **not affiliated with,
