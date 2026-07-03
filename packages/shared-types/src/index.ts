@@ -10,11 +10,13 @@
 // camelCase, and every error crossing a boundary uses the envelope below.
 
 /**
- * The one error shape every boundary returns.
+ * The one error shape every boundary returns (ARCH-10).
  *
- * This is the shape PostgREST and GoTrue already return by default; every Edge
- * Function (starting with `catalog-search` in Story 1.4) must conform to it
- * exactly rather than inventing its own error format.
+ * This is the canonical envelope every Edge Function (starting with
+ * `catalog-search` in Story 1.4) must return. PostgREST's default errors are
+ * already close to it (`message`/`code`/`details`/`hint`), but GoTrue's are not
+ * (it uses `msg` and omits `details`), so errors proxied from upstream services
+ * must be normalized to this envelope rather than passed through raw.
  */
 export interface ErrorEnvelope {
   /** Human-readable description of what went wrong. */
