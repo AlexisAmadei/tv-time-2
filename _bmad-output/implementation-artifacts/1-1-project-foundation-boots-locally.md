@@ -4,7 +4,7 @@ baseline_commit: 6f522d689fd9f0b47c831d39bef5a2006e5148d0
 
 # Story 1.1: Project foundation boots locally
 
-Status: review
+Status: done
 
 ## Story
 
@@ -46,6 +46,22 @@ so that every later story has a working, reproducible substrate to build on.
   - [x] Add a short note (root `README.md` or `CONTRIBUTING.md`) stating: Postgres tables/columns are `snake_case`, TypeScript is `camelCase`, ids are `uuid` (`gen_random_uuid()`), timestamps are `timestamptz` UTC ISO 8601, ratings are `smallint` half-steps, moods are `text[]` + `CHECK` (never `ENUM`) — this is guardrail documentation for every story that follows, not code to write now
 - [x] Task 6: Update root `.gitignore` (AC: #1, #2)
   - [x] Add `node_modules/`, `supabase/.env` (keep `supabase/.env.example` tracked), `.expo/`, and standard Expo/RN build artifacts — current `.gitignore` only excludes `.claude/`
+
+### Review Findings
+
+_Code review 2026-07-03 (branch `main...HEAD`, 3 commits). Blind Hunter + Edge Case Hunter + Acceptance Auditor. All 4 ACs assessed SATISFIED; findings below are reliability/robustness. 6 findings dismissed as noise (documented/justified deviations)._
+
+- [x] [Review][Defer] Edge Functions may never report healthy → fails the AC1 "six healthy" gate — Two intertwined causes: (a) the `functions` healthcheck uses `bash` + `/dev/tcp` which the Deno-based `edge-runtime` image may not contain [supabase/docker-compose.yml ~L1838]; (b) `main/index.ts` imports `jose` from a live `deno.land/x` URL with no lock/vendor, so a cold/offline first bring-up leaves `main` unable to load [supabase/functions/main/index.ts L1929]. Options if revisited: vendor/pin `jose` + make the healthcheck `sh`-compatible; document a network prereq for first boot; or drop `functions` from the smoke-check EXPECTED set. — **deferred:** app home screen already gets a Supabase 200, so the stack connects fine in practice; the functions-healthy gate isn't an active blocker.
+- [x] [Review][Patch] RN health check relies on `AbortSignal.timeout()` — may be undefined in Hermes, surfacing a false "cannot reach Supabase" error even when the stack is up (runtime path never executed — only `expo export` was tested) [app/data/supabaseClient.ts ~L834]
+- [x] [Review][Patch] Missing/blank `EXPO_PUBLIC_*` throws at module-eval time, before App's error UI can render — a *wrong* key is handled gracefully but a *missing* key redboxes, inconsistent with AC2's clear-error intent [app/data/supabaseClient.ts ~L795]
+- [x] [Review][Patch] `smoke-check.mjs` per-line `JSON.parse` is unguarded → any warning line on `docker compose ps` stdout crashes `verify` with a stack trace instead of a clean fail [scripts/smoke-check.mjs ~L1376]
+- [x] [Review][Patch] `smoke-check.mjs` runs `docker compose` without `-f`, unlike the `package.json` scripts → may not locate the compose file when run from repo root [scripts/smoke-check.mjs ~L1338]
+- [x] [Review][Patch] `smoke-check.mjs` reports a missing `supabase/.env` as "Gateway probe failed: ENOENT" instead of telling the operator to run `generate-keys.mjs` [scripts/smoke-check.mjs ~L1392]
+- [x] [Review][Patch] `generate-keys.mjs` silently omits a secret if a `.env.example` line is renamed/removed — no completeness assertion, reproducing the silent-401 trap the script exists to prevent [supabase/scripts/generate-keys.mjs ~L2183]
+- [x] [Review][Patch] `generate-keys.mjs --force` writes fresh secrets into an existing `.env` but cannot tighten its mode (`0o600` only applies on create) — a world-readable `.env` stays world-readable [supabase/scripts/generate-keys.mjs L2195]
+- [x] [Review][Patch] `packages/shared-types` README + `isErrorEnvelope` claim GoTrue "already returns" `{message, code, details}` — GoTrue uses `msg` and omits `details`, so the guard rejects real GoTrue errors; correct the misleading claim [packages/shared-types/src/index.ts L1255; README]
+- [x] [Review][Patch] Kong config retains routes to dropped services (studio/meta/realtime); the catch-all `/` route 502s to a nonexistent `studio:3000` — prune dead routes (low; vendored) [supabase/volumes/api/kong.yml]
+- [x] [Review][Patch] `.env.example` hardcodes `localhost:8000`, which breaks the health check on a physical device (localhost = the device) — add a LAN-IP note (low) [app/.env.example L9]
 
 ## Dev Notes
 
