@@ -46,3 +46,7 @@ yarn-error.*
 # TypeScript build output
 *.tsbuildinfo
 packages/*/dist/
+
+
+# bemad
+*.bak
