@@ -14,7 +14,7 @@
 // No dependencies — uses Node's built-in crypto only.
 
 import { createHmac, randomBytes } from 'node:crypto';
-import { readFileSync, writeFileSync, existsSync } from 'node:fs';
+import { readFileSync, writeFileSync, existsSync, chmodSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 
@@ -80,7 +80,24 @@ const out = template
   })
   .join('\n');
 
+// Fail loudly if the template lost a secret's line: an omitted key would write a
+// .env missing that secret while reporting success — reproducing the silent-401
+// trap this script exists to prevent.
+const missing = Object.keys(replacements).filter(
+  (key) => !new RegExp(`^${key}=.+`, 'm').test(out),
+);
+if (missing.length > 0) {
+  console.error(
+    `${examplePath} has no line for: ${missing.join(', ')}.\n` +
+      `Every generated secret needs a "KEY=" line in the template — add them and re-run.`,
+  );
+  process.exit(1);
+}
+
 writeFileSync(envPath, out, { mode: 0o600 });
+// mode: only applies when the file is created, so on --force (existing file) the
+// old permissions would persist — chmod explicitly to guarantee 0600 either way.
+chmodSync(envPath, 0o600);
 
 console.log(`Wrote ${envPath} with a fresh secret set.`);
 console.log('  JWT_SECRET, POSTGRES_PASSWORD, DASHBOARD_PASSWORD, S3 keys: random');
