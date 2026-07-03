@@ -1,0 +1,17 @@
+{
+  "name": "tv-time-2",
+  "version": "0.0.0",
+  "private": true,
+  "description": "TV Time 2 — private-by-default film & TV tracker (Expo client + self-hosted Supabase).",
+  "packageManager": "pnpm@10.28.2",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "supabase:up": "docker compose -f supabase/docker-compose.yml --project-directory supabase up -d",
+    "supabase:down": "docker compose -f supabase/docker-compose.yml --project-directory supabase down",
+    "supabase:keys": "node supabase/scripts/generate-keys.mjs",
+    "app": "pnpm --filter app start",
+    "verify": "node scripts/smoke-check.mjs"
+  }
+}

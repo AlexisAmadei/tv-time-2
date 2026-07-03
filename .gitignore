@@ -1,1 +1,48 @@
+# Claude Code local settings
 .claude/
+
+# Dependencies
+node_modules/
+
+# Secrets — the real env is generated locally and never committed.
+# The tracked template is supabase/.env.example.
+supabase/.env
+.env
+.env.local
+
+# Supabase self-hosted stack runtime data (Postgres data dir, storage blobs)
+supabase/volumes/db/data/
+supabase/volumes/storage/
+
+# Expo / React Native
+.expo/
+app/.expo/
+dist/
+web-build/
+expo-env.d.ts
+
+# Native build artifacts
+android/
+ios/
+*.jks
+*.p8
+*.p12
+*.key
+*.mobileprovision
+*.keystore
+
+# Metro / bundler
+.metro-health-check*
+
+# Logs
+*.log
+npm-debug.*
+yarn-debug.*
+yarn-error.*
+
+# macOS
+.DS_Store
+
+# TypeScript build output
+*.tsbuildinfo
+packages/*/dist/

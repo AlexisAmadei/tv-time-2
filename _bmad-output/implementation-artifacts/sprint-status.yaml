@@ -1,0 +1,103 @@
+# generated: 2026-07-02
+# last_updated: 2026-07-03
+# project: tv-time-2
+# project_key: NOKEY
+# tracking_system: file-system
+# story_location: {project-root}/_bmad-output/implementation-artifacts
+
+# STATUS DEFINITIONS:
+# ==================
+# Epic Status:
+#   - backlog: Epic not yet started
+#   - in-progress: Epic actively being worked on
+#   - done: All stories in epic completed
+#
+# Epic Status Transitions:
+#   - backlog → in-progress: Automatically when first story is created (via create-story)
+#   - in-progress → done: Manually when all stories reach 'done' status
+#
+# Story Status:
+#   - backlog: Story only exists in epic file
+#   - ready-for-dev: Story file created in stories folder
+#   - in-progress: Developer actively working on implementation
+#   - review: Ready for code review (via Dev's code-review workflow)
+#   - done: Story completed
+#
+# Retrospective Status:
+#   - optional: Can be completed but not required
+#   - done: Retrospective has been completed
+#
+# Action Item Status:
+#   - open: Committed during a retrospective, not yet addressed
+#   - in-progress: Actively being worked on
+#   - done: Completed
+#
+# WORKFLOW NOTES:
+# ===============
+# - Epic transitions to 'in-progress' automatically when first story is created
+# - Stories can be worked in parallel if team capacity allows
+# - Developer typically creates next story after previous one is 'done' to incorporate learnings
+# - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
+# - Retrospective appends its action items to action_items; sprint-status surfaces open ones
+
+generated: 2026-07-02
+last_updated: 2026-07-03
+project: tv-time-2
+project_key: NOKEY
+tracking_system: file-system
+story_location: "{project-root}/_bmad-output/implementation-artifacts"
+
+development_status:
+  epic-1: in-progress
+  1-1-project-foundation-boots-locally: review
+  1-2-create-an-account-and-sign-in-google-free: backlog
+  1-3-themed-app-shell-with-bottom-navigation-dark-mode: backlog
+  1-4-search-a-real-title-through-the-proxied-catalog: backlog
+  1-5-log-a-watch-local-first-surviving-a-network-drop: backlog
+  1-6-prove-the-private-by-default-wall: backlog
+  epic-1-retrospective: optional
+
+  epic-2: backlog
+  2-1-full-search-experience: backlog
+  2-2-title-detail-for-films-and-shows: backlog
+  2-3-save-a-title-to-the-watchlist: backlog
+  2-4-watchlist-shelf-on-home: backlog
+  epic-2-retrospective: optional
+
+  epic-3: backlog
+  3-1-track-a-show-or-film-into-up-next: backlog
+  3-2-one-tap-watched-advances-the-pointer: backlog
+  3-3-log-a-film-in-one-action: backlog
+  3-4-bulk-log-a-whole-season: backlog
+  3-5-rate-and-react-after-a-watch: backlog
+  3-6-attach-an-optional-note-to-a-watch: backlog
+  3-7-edit-or-remove-a-logged-watch: backlog
+  3-8-optional-recommendations-shelf-non-blocking: backlog
+  epic-3-retrospective: optional
+
+  epic-4: backlog
+  4-1-the-diary-your-chronological-watch-history: backlog
+  4-2-profile-you-stats-favorites-watchlist-friends: backlog
+  4-3-settings-switch-to-paper-white-persisted: backlog
+  4-4-edit-your-profile-display-name-and-avatar: backlog
+  epic-4-retrospective: optional
+
+  epic-5: backlog
+  5-1-follow-friends-and-find-them: backlog
+  5-2-opt-in-to-sharing-my-activity: backlog
+  5-3-the-chronological-activity-feed: backlog
+  5-4-add-to-watchlist-from-a-feed-entry: backlog
+  5-5-shared-lists: backlog
+  epic-5-retrospective: optional
+
+  epic-6: backlog
+  6-1-per-title-notify-bell-and-global-toggle: backlog
+  6-2-caught-up-nudge: backlog
+  6-3-device-registration-and-per-build-push-channel: backlog
+  6-4-daily-new-episode-poller-and-fan-out: backlog
+  epic-6-retrospective: optional
+
+  epic-7: backlog
+  7-1-export-my-data: backlog
+  7-2-delete-my-account: backlog
+  epic-7-retrospective: optional
