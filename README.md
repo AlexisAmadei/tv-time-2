@@ -1,9 +1,38 @@
 # TV Time 2
 
-A private-by-default film & TV tracker. Expo/React Native client backed by a
-self-hosted Supabase stack.
+A private-by-default film & TV tracker, built as an open-source successor to
+[TV Time](https://tvtime.com), which shut down on July 15, 2026 and took every
+user's watch history with it.
 
-This repository is a pnpm monorepo:
+TV Time 2 is a personal watch-memory first and a small social network second:
+log what you watch, react with a fast **mood chip** (a curated emoji set, not
+a flattened star rating) that captures how you felt *at the moment you
+watched it*, and build a private, honest timeline over time. It's multi-user
+by design — follow friends, see their reactions, share lists — but there's no
+monetization plan, no ads, and no proprietary lock-in. It's open source and
+aimed at F-Droid distribution, so no one can take your history away again.
+
+## Disclaimer
+
+This is an independent, unofficial fan project. I am **not affiliated with,
+endorsed by, or connected to TV Time or its team** in any way — I'm just
+someone who used the app daily and didn't want that history to disappear.
+The name "TV Time 2" is a placeholder tribute, not a claim of continuity or
+ownership. I'm building this in my own time, for free, as a kind of legacy
+for the app and the habit it gave me — not as a commercial product or an
+official successor.
+
+**Core v1 features:** catalog search · track shows/films with progress ·
+one-tap Watched + bulk season log · hybrid rating (½-star + mood chips) with
+optional notes · timestamped watch-memory (Diary) · profile stats ·
+watchlist · light social (follow, chronological feed, private-by-default
+visibility, shared lists) · new-episode push notifications · native iOS +
+Android (one codebase, F-Droid variant) · dark + Paper White themes.
+
+## Stack
+
+Expo/React Native client backed by a self-hosted Supabase stack, in a pnpm
+monorepo:
 
 ```text
 app/                  # Expo/React Native client (SDK 56)
