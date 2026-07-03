@@ -17,10 +17,12 @@ The kanban runs [Kan.bn](https://kan.bn). Used to push the sprint plan into the 
 |--------|--------|------|
 | List workspaces | GET | `/workspaces` |
 | List boards in a workspace | GET | `/workspaces/{workspacePublicId}/boards` |
+| Get a board (lists + nested cards) | GET | `/boards/{boardPublicId}` |
 | Create a label | POST | `/labels` |
 | Create a card | POST | `/cards` |
+| Update a card (rename / move / due date) | PUT | `/cards/{cardPublicId}` |
 
-Other available groups (unused so far): lists (`/lists`), card checklists/comments/members, board create/update, label update/delete. See `llms.txt`.
+Other available groups (unused so far): lists (`/lists`), card checklists/comments/members, label update/delete. See `llms.txt`.
 
 #### GET `/workspaces`
 Returns `[{ role, workspace: { publicId, name, description, slug, plan, weekStartDay, cardPrefix, deletedAt } }]`.
@@ -36,6 +38,13 @@ Returns `[{ publicId, name, favorite, lists: [{ publicId, name, index }], labels
 - `name`: 1–36 chars · `colourCode`: **exactly 7 chars** (`#rrggbb`).
 - Returns `{ publicId, name, colourCode }`.
 
+#### GET `/boards/{boardPublicId}`
+Returns the board with every list and its cards nested — this is the only way to enumerate existing cards (no standalone "list cards" endpoint):
+```json
+{ "lists": [ { "publicId", "name", "index", "cards": [ { "publicId", "title", "description", "index", "labels": [{publicId,name,colourCode}], ... } ] } ] }
+```
+Use this to find a card's current `publicId`/list by matching on `title`.
+
 #### POST `/cards`
 ```json
 {
@@ -49,6 +58,14 @@ Returns `[{ publicId, name, favorite, lists: [{ publicId, name, index }], labels
 ```
 - `title`: 1–2000 · `description`: ≤10000 · `position`: `"start"`|`"end"` · `dueDate` optional/nullable.
 - Returns `{ publicId }`.
+
+#### PUT `/cards/{cardPublicId}`
+```json
+{ "listPublicId": "<list>" }
+```
+- Accepts any of `title`, `description`, `index`, `listPublicId`, `dueDate` — send only the field(s) you're changing. This is how a card moves between columns (e.g. Backlog → In Progress).
+- **Cannot** update `labelPublicIds`/`memberPublicIds` through this endpoint.
+- Returns `{ publicId, title, description, dueDate }` — no `listPublicId` echoed back, so re-`GET /boards/{boardPublicId}` if you need to confirm the move.
 
 ### Resolved IDs
 
@@ -105,3 +122,23 @@ Invoke-RestMethod -Uri "https://kanban.kiwidev.fr/api/v1/cards" -Method Post -He
 ```
 
 > Inside a PowerShell here-string (`@"..."@`), double the `"` quotes.
+
+### Recipe — fetch board state (find a card's publicId + current list)
+
+```bash
+curl -s "https://kanban.kiwidev.fr/api/v1/boards/2v4jlcbhpupd" \
+    -H "Authorization: Bearer $KAN_KEY" \
+  | jq '[.lists[] | {list: .name, listId: .publicId, cards: [.cards[] | {publicId, title}]}]'
+```
+
+### Recipe — move a card to a different list
+
+```bash
+curl -s -X PUT "https://kanban.kiwidev.fr/api/v1/cards/<cardPublicId>" \
+    -H "Authorization: Bearer $KAN_KEY" -H "Content-Type: application/json" \
+    -d '{"listPublicId": "bwblwuxiugfx"}'
+```
+
+### Related command
+
+`/update-kanban` (`.claude/commands/update-kanban.md`) syncs board card positions from `_bmad-output/implementation-artifacts/sprint-status.yaml` — moves each story's card to the list matching its BMad status. See that file for the status→list mapping.
