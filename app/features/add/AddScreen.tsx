@@ -1,16 +1,9 @@
-import { StyleSheet, Text, View } from 'react-native';
+// Add — the (+) fast-add target, themed placeholder (Story 1.3). The center (+)
+// routes here now; the real search-first log flow is Story 1.4 (search) / 1.5
+// (log).
 
-// Stub — the Add tab (search + fast-add flow, center (+) tab) is built out from
-// Story 2.1. Placeholder screen only for the Story 1.1 scaffold.
+import { PlaceholderScreen } from '../../components/PlaceholderScreen';
+
 export default function AddScreen() {
-  return (
-    <View style={styles.container}>
-      <Text style={styles.title}>Add</Text>
-    </View>
-  );
+  return <PlaceholderScreen title="Log a watch" subtitle="Search-first logging arrives soon." />;
 }
-
-const styles = StyleSheet.create({
-  container: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  title: { fontSize: 18, fontWeight: '600' },
-});

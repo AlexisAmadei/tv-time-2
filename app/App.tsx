@@ -1,18 +1,41 @@
 import { StatusBar } from 'expo-status-bar';
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { checkSupabaseHealth } from './data/supabaseClient';
 import { useSession } from './data/auth';
+import { ThemeProvider, useTheme } from './theme/ThemeProvider';
+import { useAppFonts } from './theme/fonts';
 import AuthScreen from './features/auth/AuthScreen';
-import SignedInScreen from './features/auth/SignedInScreen';
+import AppShell from './navigation/AppShell';
 
 type HealthState =
   | { phase: 'checking' }
   | { phase: 'ok' }
   | { phase: 'error'; message: string };
 
+// Providers wrap the whole tree: SafeAreaProvider (bottom-bar insets, Story 1.3
+// Task 4) and ThemeProvider (dark wired, Story 1.3 Task 2). Everything below
+// them can call useTheme() / useSafeAreaInsets().
 export default function App() {
+  return (
+    <SafeAreaProvider>
+      <ThemeProvider>
+        <AppRoot />
+      </ThemeProvider>
+    </SafeAreaProvider>
+  );
+}
+
+function AppRoot() {
+  const theme = useTheme();
+
+  // Gate first render on the bundled brand fonts so the UI never flashes a
+  // system-font fallback or renders Fraunces as the wrong glyphs (Story 1.3
+  // Task 3). Fonts + the Supabase health probe (1.1 AC2) both resolve before
+  // any real UI shows.
+  const { loaded: fontsLoaded, error: fontError } = useAppFonts();
   const [health, setHealth] = useState<HealthState>({ phase: 'checking' });
 
   useEffect(() => {
@@ -29,53 +52,83 @@ export default function App() {
     };
   }, []);
 
+  useEffect(() => {
+    if (fontError) {
+      // Fail open: proceed with the system font rather than hang forever.
+      console.warn('Brand fonts failed to load; falling back to system font.', fontError);
+    }
+  }, [fontError]);
+
+  // One status-bar declaration, derived from the active theme (dark → light
+  // content). Declared once here so every branch below inherits it; when Story
+  // 4.3 wires Paper White this flips automatically.
+  const statusBar = <StatusBar style={theme.mode === 'dark' ? 'light' : 'dark'} />;
+
+  // Fonts still loading with no error yet — a bare spinner (no text, so no font
+  // fallback shows). `fontError` unblocks the gate (system-font fallback).
+  if (!fontsLoaded && !fontError) {
+    return (
+      <>
+        {statusBar}
+        <Loading />
+      </>
+    );
+  }
+
   return (
     <>
-      {health.phase === 'checking' && (
-        <Centered>
-          <ActivityIndicator />
-          <Text style={styles.muted}>Checking Supabase connectivity…</Text>
-        </Centered>
-      )}
-      {health.phase === 'error' && (
-        <Centered>
-          <Text style={styles.error}>✗ {health.message}</Text>
-        </Centered>
-      )}
+      {statusBar}
+      {health.phase === 'checking' && <Loading label="Checking Supabase connectivity…" />}
+      {health.phase === 'error' && <ErrorState message={health.message} />}
       {health.phase === 'ok' && <AuthGate />}
-      <StatusBar style="auto" />
     </>
   );
 }
 
-// Renders the auth screen or the signed-in app depending on session state.
-// Story 1.3 replaces SignedInScreen with the themed shell + bottom navigation.
+// Renders the auth screen or the themed app shell depending on session state.
+// Story 1.3 replaced the 1.2 SignedInScreen with <AppShell> (bottom navigation);
+// the 1.2 session gate is preserved.
 function AuthGate() {
   const { session, loading } = useSession();
 
   if (loading) {
-    return (
-      <Centered>
-        <ActivityIndicator />
-      </Centered>
-    );
+    return <Loading />;
   }
-  return session ? <SignedInScreen session={session} /> : <AuthScreen />;
+  return session ? <AppShell session={session} /> : <AuthScreen />;
 }
 
-function Centered({ children }: { children: React.ReactNode }) {
-  return <View style={styles.centered}>{children}</View>;
+function Loading({ label }: { label?: string }) {
+  const theme = useTheme();
+  return (
+    <View style={[styles.centered, { backgroundColor: theme.colors.surfaceBase }]}>
+      <ActivityIndicator color={theme.colors.primary} />
+      {label ? (
+        <Text style={[theme.type.body, { color: theme.colors.inkSecondary, marginTop: 12 }]}>
+          {label}
+        </Text>
+      ) : null}
+    </View>
+  );
+}
+
+function ErrorState({ message }: { message: string }) {
+  const theme = useTheme();
+  return (
+    <View style={[styles.centered, { backgroundColor: theme.colors.surfaceBase }]}>
+      <Text style={[theme.type.body, styles.error, { color: theme.colors.primary }]}>
+        ✗ {message}
+      </Text>
+    </View>
+  );
 }
 
 const styles = StyleSheet.create({
   centered: {
     flex: 1,
-    backgroundColor: '#fff',
     alignItems: 'center',
     justifyContent: 'center',
     padding: 24,
     gap: 12,
   },
-  muted: { color: '#666' },
-  error: { color: '#b00020', textAlign: 'center' },
+  error: { textAlign: 'center' },
 });
