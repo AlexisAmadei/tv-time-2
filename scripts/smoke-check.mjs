@@ -136,13 +136,17 @@ if (anonKey) {
     const external = settings.external || {};
     if (external.email !== true) {
       fail('GoTrue: email auth is not enabled (expected external.email === true).');
+    } else if (external.phone === true) {
+      fail('GoTrue: phone auth is enabled — must stay email-only (AD-12).');
+    } else if (external.anonymous_users === true) {
+      fail('GoTrue: anonymous sign-in is enabled — must stay email-only (AD-12).');
     } else {
       const oauthOn = Object.entries(external)
         .filter(([k, v]) => v === true && k !== 'email' && k !== 'phone' && k !== 'anonymous_users');
       if (oauthOn.length > 0) {
         fail(`GoTrue: OAuth provider(s) enabled — must be Google-free (${oauthOn.map(([k]) => k).join(', ')}).`);
       } else {
-        ok('GoTrue exposes only email auth — no OAuth provider enabled.');
+        ok('GoTrue exposes only email auth — no OAuth provider, phone, or anonymous sign-in enabled.');
       }
     }
   } catch (err) {

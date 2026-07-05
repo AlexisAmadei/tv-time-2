@@ -27,15 +27,26 @@ export function useSession(): SessionState {
 
   useEffect(() => {
     let mounted = true;
+    // onAuthStateChange can fire (e.g. a sign-in completing) before the initial
+    // getSession() lookup resolves; once that happens, the session is live and
+    // getSession()'s eventually-stale result must not overwrite it.
+    let live = false;
 
-    supabase.auth.getSession().then(({ data }) => {
-      if (!mounted) return;
-      setSession(data.session);
-      setLoading(false);
-    });
+    supabase.auth
+      .getSession()
+      .then(({ data }) => {
+        if (!mounted || live) return;
+        setSession(data.session);
+        setLoading(false);
+      })
+      .catch(() => {
+        if (!mounted || live) return;
+        setLoading(false);
+      });
 
     const { data } = supabase.auth.onAuthStateChange((_event, nextSession) => {
       if (!mounted) return;
+      live = true;
       setSession(nextSession);
       setLoading(false);
     });
@@ -49,9 +60,15 @@ export function useSession(): SessionState {
   return { session, loading };
 }
 
-/** Sign the current user out (clears the persisted session). */
+/** Sign the current user out (clears the persisted session). Used directly as a
+ * `Pressable` `onPress`, so swallow (log) failures rather than letting them
+ * surface as an unhandled rejection. */
 export async function signOut(): Promise<void> {
-  await supabase.auth.signOut();
+  try {
+    await supabase.auth.signOut();
+  } catch (err) {
+    console.warn('signOut failed:', err);
+  }
 }
 
 /** Client-side @username rule — mirrors the DB check constraint (0001_profiles.sql). */

@@ -91,3 +91,20 @@ drop trigger if exists on_auth_user_created on auth.users;
 create trigger on_auth_user_created
   after insert on auth.users
   for each row execute function public.handle_new_user();
+
+-- Bound display_name/avatar length. Unlike username (CHECK above), these were
+-- unconstrained text columns populated via the SECURITY DEFINER trigger from
+-- client-controlled sign-up metadata — nothing stopped an arbitrarily large
+-- string from being stored. Added via a guarded DO block (not `if not exists`,
+-- which ADD CONSTRAINT doesn't support) so re-applying this file stays safe.
+do $$
+begin
+  if not exists (select 1 from pg_constraint where conname = 'profiles_display_name_length') then
+    alter table public.profiles
+      add constraint profiles_display_name_length check (display_name is null or char_length(display_name) <= 100);
+  end if;
+  if not exists (select 1 from pg_constraint where conname = 'profiles_avatar_length') then
+    alter table public.profiles
+      add constraint profiles_avatar_length check (avatar is null or char_length(avatar) <= 2048);
+  end if;
+end $$;

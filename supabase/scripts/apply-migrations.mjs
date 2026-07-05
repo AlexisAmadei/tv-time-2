@@ -32,7 +32,10 @@ for (const file of files) {
   try {
     execFileSync(
       'docker',
-      [...compose, 'exec', '-T', 'db', 'psql', '-U', 'postgres', '-d', 'postgres', '-v', 'ON_ERROR_STOP=1', '-q'],
+      // -1 (--single-transaction) wraps the whole file in one transaction, so a
+      // mid-file failure rolls back everything already run in it instead of
+      // leaving a half-applied migration committed.
+      [...compose, 'exec', '-T', 'db', 'psql', '-U', 'postgres', '-d', 'postgres', '-v', 'ON_ERROR_STOP=1', '-1', '-q'],
       { input: sql, stdio: ['pipe', 'inherit', 'inherit'] },
     );
     console.log('ok');

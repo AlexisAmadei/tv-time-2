@@ -63,19 +63,25 @@ export default function AuthScreen() {
     });
     setBusy(false);
     if (signUpError) {
-      // A colliding @username (or email) makes the profile-creation trigger roll
-      // the whole sign-up back. This GoTrue build surfaces that as an unhelpful
-      // message (empty / "{}" / a raw DB-constraint string), so show a friendly
-      // catch-all for those. Since the @username format is already validated
-      // above, a duplicate is the dominant cause. Genuinely informative
-      // validation errors (weak password, malformed email) are passed through.
-      const raw = signUpError.message ?? '';
-      const uninformative = raw.trim() === '' || raw.trim() === '{}' || /database error|duplicate|constraint/i.test(raw);
-      setError(
-        uninformative
-          ? 'Couldn’t create your account — that email or @username may already be in use. Try another.'
-          : raw,
-      );
+      if (signUpError.code === 'email_exists' || signUpError.code === 'user_already_exists') {
+        // GoTrue itself checks email uniqueness before the trigger ever runs —
+        // a real, stable error code, no guessing needed.
+        setError('That email is already registered. Try signing in instead.');
+      } else if (signUpError.status === 500) {
+        // A colliding (or malformed) @username makes the profile-creation
+        // trigger roll the whole sign-up back. GoTrue collapses any trigger
+        // failure into an opaque 500 with code "unexpected_failure" — it never
+        // re-surfaces the underlying Postgres error text — so there's no
+        // structured way to confirm "duplicate username" specifically. Since
+        // the @username format is already validated above, a duplicate is the
+        // dominant cause of a 500 here; show a friendly catch-all instead of
+        // GoTrue's unhelpful raw message (empty / "{}" / a raw DB string).
+        setError('Couldn’t create your account — that email or @username may already be in use. Try another.');
+      } else {
+        // Genuinely informative validation errors (weak password, malformed
+        // email) have their own codes/status and are passed through as-is.
+        setError(signUpError.message);
+      }
     }
     // On success onAuthStateChange takes over (autoconfirm is on in local dev).
   }

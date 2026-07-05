@@ -7,8 +7,9 @@
 // from Story 1.2, so sign-out MUST stay reachable: it moves here as a temporary
 // affordance until Settings exists. Do not drop it.
 
+import { useState } from 'react';
 import type { Session } from '@supabase/supabase-js';
-import { Pressable, StyleSheet, Text } from 'react-native';
+import { ActivityIndicator, Pressable, StyleSheet, Text } from 'react-native';
 
 import { Screen } from '../../components/Screen';
 import { useTheme } from '../../theme/ThemeProvider';
@@ -16,8 +17,19 @@ import { signOut } from '../../data/auth';
 
 export default function ProfileScreen({ session }: { session: Session }) {
   const theme = useTheme();
+  const [signingOut, setSigningOut] = useState(false);
   const username =
-    (session.user.user_metadata?.username as string | undefined) ?? session.user.email;
+    (session.user.user_metadata?.username as string | undefined) || session.user.email;
+
+  const handleSignOut = async () => {
+    if (signingOut) return;
+    setSigningOut(true);
+    try {
+      await signOut();
+    } finally {
+      setSigningOut(false);
+    }
+  };
 
   return (
     <Screen>
@@ -29,9 +41,11 @@ export default function ProfileScreen({ session }: { session: Session }) {
       </Text>
 
       <Pressable
-        onPress={signOut}
+        onPress={handleSignOut}
+        disabled={signingOut}
         accessibilityRole="button"
         accessibilityLabel="Sign out"
+        accessibilityState={{ disabled: signingOut, busy: signingOut }}
         style={({ pressed }) => [
           styles.button,
           {
@@ -39,10 +53,15 @@ export default function ProfileScreen({ session }: { session: Session }) {
             borderColor: theme.colors.borderHairline,
             borderRadius: theme.radius.md,
             backgroundColor: pressed ? theme.colors.surfaceSunken : theme.colors.surfaceRaised,
+            opacity: signingOut ? 0.6 : 1,
           },
         ]}
       >
-        <Text style={[theme.type.label, { color: theme.colors.inkPrimary }]}>Sign out</Text>
+        {signingOut ? (
+          <ActivityIndicator color={theme.colors.inkPrimary} />
+        ) : (
+          <Text style={[theme.type.label, { color: theme.colors.inkPrimary }]}>Sign out</Text>
+        )}
       </Pressable>
     </Screen>
   );
