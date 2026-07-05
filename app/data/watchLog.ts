@@ -12,6 +12,10 @@ import { getDb } from './db';
 import { supabase } from './supabaseClient';
 import { triggerSync } from './watchSync';
 
+// Best-effort "already watched" lookup is bounded like every other network
+// call in this codebase (catalog.ts races 10s) — a hung server never blocks it.
+const LOGGED_KEYS_TIMEOUT_MS = 10_000;
+
 export interface LogWatchInput {
   tmdbId: number;
   mediaType: 'movie' | 'tv';
@@ -29,6 +33,15 @@ export function watchKey(tmdbId: number, mediaType: string): string {
  */
 export async function logWatch(input: LogWatchInput): Promise<void> {
   const db = await getDb();
+  // Stamp the owner onto the outbox row so a pending watch is never drained or
+  // attributed to a different account that signs in on the same device before
+  // this one syncs. The app shell is behind the auth gate, so a session is
+  // present whenever this is reachable; guard defensively regardless.
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
+  if (!session) throw new Error('logWatch: no active session');
+
   const id = randomUUID();
   const now = new Date().toISOString();
 
@@ -36,9 +49,10 @@ export async function logWatch(input: LogWatchInput): Promise<void> {
   // is the whole point of AC1. Never fire the sync attempt first.
   await db.runAsync(
     `insert into pending_watches
-      (id, tmdb_id, media_type, tmdb_episode_id, watched_at, rating, mood, note, synced_at, created_at)
-     values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      (id, user_id, tmdb_id, media_type, tmdb_episode_id, watched_at, rating, mood, note, synced_at, created_at)
+     values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     id,
+    session.user.id,
     input.tmdbId,
     input.mediaType,
     null,
@@ -72,24 +86,40 @@ export async function getLoggedKeys(
   const logged = new Set<string>();
   const ids = [...new Set(items.map((i) => i.tmdbId))];
 
-  const db = await getDb();
-  const placeholders = ids.map(() => '?').join(',');
-  const localRows = await db.getAllAsync<{ tmdb_id: number; media_type: string }>(
-    `select distinct tmdb_id, media_type from pending_watches where tmdb_id in (${placeholders})`,
-    ids,
-  );
-  for (const row of localRows) logged.add(watchKey(row.tmdb_id, row.media_type));
-
+  // No session → nothing can be attributed to a user; degrade to no keys rather
+  // than surface another account's local outbox rows (they're user-scoped now).
   const {
     data: { session },
   } = await supabase.auth.getSession();
-  if (session) {
-    const { data } = await supabase
-      .from('watches')
-      .select('tmdb_id, media_type')
-      .eq('user_id', session.user.id)
-      .in('tmdb_id', ids);
-    for (const row of data ?? []) logged.add(watchKey(row.tmdb_id, row.media_type));
+  if (!session) return new Set();
+
+  const db = await getDb();
+  const placeholders = ids.map(() => '?').join(',');
+  const localRows = await db.getAllAsync<{ tmdb_id: number; media_type: string }>(
+    `select distinct tmdb_id, media_type from pending_watches where user_id = ? and tmdb_id in (${placeholders})`,
+    [session.user.id, ...ids],
+  );
+  for (const row of localRows) logged.add(watchKey(row.tmdb_id, row.media_type));
+
+  // Best-effort server lookup, bounded by a timeout (codebase convention) and
+  // wrapped so a hung/failed/aborted query degrades to local-only keys rather
+  // than throwing away the local matches computed above.
+  try {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), LOGGED_KEYS_TIMEOUT_MS);
+    try {
+      const { data } = await supabase
+        .from('watches')
+        .select('tmdb_id, media_type')
+        .eq('user_id', session.user.id)
+        .in('tmdb_id', ids)
+        .abortSignal(controller.signal);
+      for (const row of data ?? []) logged.add(watchKey(row.tmdb_id, row.media_type));
+    } finally {
+      clearTimeout(timer);
+    }
+  } catch {
+    // best-effort — leave the local keys as-is
   }
 
   // `.in('tmdb_id', ids)` alone can cross-match a movie and a show that happen

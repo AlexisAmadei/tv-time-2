@@ -4,7 +4,7 @@ baseline_commit: 44f6acaddba6b0b4207c39d7dda06c31f2c6c56b
 
 # Story 1.5: Log a watch, local-first, surviving a network drop
 
-Status: review
+Status: done
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -192,4 +192,28 @@ claude-sonnet-5 (Claude Code, bmad-dev-story workflow)
 
 - 2026-07-05 — Story 1.5 implemented: `watches` migration (owner-only RLS, AD-1/AD-3/AD-4/AD-8), local `expo-sqlite` outbox (`pending_watches`) + `logWatch`, idempotent sync worker (`triggerSync`, upsert keyed on client-generated id), tappable Add-tab log action with a transient "Logged — nice one." confirmation. Wired sync triggers at all three call sites (opportunistic, foreground, reconnect). Extended `smoke-check.mjs`. Status → review.
 - 2026-07-05 — Post-review design pass (Alex, same day): (1) swapped the whole-row tap for a dedicated checkmark icon button, freeing the row for Epic 2's future title-detail navigation; (2) added `getLoggedKeys()` so already-watched results show a filled checkmark (`theme.colors.primary` — no green token exists in the palette, confirmed with Alex rather than inventing a literal hex); (3) replaced the inline confirmation banner with an animated bottom toast (RN `Animated`, Reduce Motion aware). No AC or schema changes; `tsc`/`expo export`/`pnpm run verify` re-verified green after each change.
+
+## Review Findings
+
+Code review 2026-07-05 (commit `90e8ab1`, review mode: full — 3 layers: Blind Hunter, Edge Case Hunter, Acceptance Auditor). All 8 ACs and AD-1/AD-3/AD-4/AD-8/ARCH-10 audited SATISFIED; findings below are robustness/edge-case gaps, not AC violations.
+
+**Decision resolved → patched** (Alex chose to scope the outbox now; multi-account-on-device is in v1 scope):
+
+- [x] [Review][Patch] `pending_watches` outbox is not user-scoped — a pending watch is misattributed on account switch — On a shared device: user A logs a watch offline, signs out before it syncs, user B signs in → B's `triggerSync` drained A's pending row and wrote it as **B's** `watches` row; `getLoggedKeys`'s local query had the same blind spot. **Fixed:** added a `user_id` column to `pending_watches` (idempotent `create`/`alter` in `db.ts`), stamped from the session at `logWatch` time, and filtered on in both the sync drain (`watchSync.ts` `where synced_at is null and user_id = ?`) and the logged-keys local query (`watchLog.ts`). `getLoggedKeys`/`logWatch` now no-op/throw without a session.
+
+**Patches (fixed):**
+
+- [x] [Review][Patch] `handleLog` shows the "Logged — nice one." confirmation without awaiting or catching `logWatch` — false success + unhandled rejection on a failed local write [app/features/add/AddScreen.tsx] (HIGH) — **Fixed:** `handleLog` now chains `logWatch(...).then(showToast(COPY_LOGGED)).catch(showToast(COPY_LOG_FAILED))` — the optimistic key + confirmation only fire once the local write resolves; a failed commit shows the failure copy, and the rejection is caught (no more unhandled rejection).
+- [x] [Review][Patch] `triggerSync` upsert has no bounded timeout — a hung request deadlocks all future syncs [app/data/watchSync.ts] (HIGH) — **Fixed:** wrapped the upsert in an `AbortController` + `UPSERT_TIMEOUT_MS` (10s) race (`.abortSignal(...)`), matching the codebase convention; a hung request now rejects → is caught per-row → `finally { syncing = false }` runs.
+- [x] [Review][Patch] A watch logged during an in-flight drain is never synced opportunistically [app/data/watchSync.ts] (MEDIUM) — **Fixed:** the drain now loops in passes (`while` re-selecting unsynced rows), continuing as long as a pass makes progress; a row added mid-drain is picked up by the next pass. Bounded — stops when a pass syncs nothing (all-failing/offline).
+- [x] [Review][Patch] A rejected `dbPromise` is memoized forever — one transient init failure bricks local storage [app/data/db.ts] (MEDIUM) — **Fixed:** `getDb`'s open/init chain now `.catch`es to null out `dbPromise` and rethrow, so a later call retries.
+- [x] [Review][Patch] Toast dismiss closure captures stale `reduceMotion` and can `setState` after unmount [app/features/add/AddScreen.tsx] (LOW) — **Fixed:** dismiss reads Reduce Motion via `reduceMotionRef` (kept in lockstep), and both the timeout branch and the animation-completion callback guard on a `mountedRef`; the unmount cleanup also `stopAnimation()`s the toast.
+- [x] [Review][Patch] `getLoggedKeys` server query has no bounded timeout [app/data/watchLog.ts] (LOW) — **Fixed:** the best-effort server lookup now races a 10s `AbortController` and is wrapped so a hung/aborted query degrades to local-only keys instead of discarding them.
+
+**Deferred:**
+
+- [x] [Review][Defer] `0003_watches.sql` (the `watches` table + owner-only RLS + grants that AC3/4/5 depend on) was committed under a mislabeled separate commit `bd11cc3 "feat: enhance authentication flow…"`, not the 1.5 feature commit `90e8ab1` [supabase/migrations/0003_watches.sql] — deferred, traceability only; ACs satisfied (file exists in tree), not code-actionable without history rewrite
+- [x] [Review][Defer] Latent `mood` type mismatch — local `pending_watches.mood` is JSON-stringified `text`, server `watches.mood` is `text[]`, and `watchSync` passes it straight through [app/data/watchSync.ts:62; app/data/db.ts:26] — deferred, inert in 1.5 (always null); Epic 3 will 400 on the first non-null mood unless a JSON→array conversion is added at the sync boundary
+
+Dismissed as noise (2): unbounded `loggedKeys` set growth across searches (harmless — matched only against current results); `getLoggedKeys` swallowing its server-select error (by design — best-effort indicator, `.catch(() => {})` at the call site).
 </content>

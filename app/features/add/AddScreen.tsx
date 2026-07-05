@@ -52,6 +52,7 @@ const CONFIRMATION_DISMISS_MS = 3000;
 const COPY_EMPTY = 'Hmm, nothing by that name. Try another spelling or title?';
 const COPY_ERROR = "Couldn't reach the catalog — check your connection and try again.";
 const COPY_LOGGED = 'Logged — nice one.';
+const COPY_LOG_FAILED = "Couldn't save that — try again.";
 
 type Phase = 'idle' | 'loading' | 'results' | 'empty' | 'error';
 
@@ -64,6 +65,7 @@ export default function AddScreen() {
   const [results, setResults] = useState<CatalogResult[]>([]);
   const [errorMsg, setErrorMsg] = useState(COPY_ERROR);
   const [toastMounted, setToastMounted] = useState(false);
+  const [toastMsg, setToastMsg] = useState(COPY_LOGGED);
   // `${mediaType}:${tmdbId}` keys already logged — checked against the local
   // outbox + synced `watches` after each search resolves (non-blocking), plus
   // optimistically as soon as a tap logs a new one.
@@ -76,6 +78,11 @@ export default function AddScreen() {
   const confirmationTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   // Drives the toast's slide-up-and-fade — 0 hidden, 1 shown.
   const toastAnim = useRef(new Animated.Value(0)).current;
+  // Mirror of `reduceMotion` so the deferred dismiss closure reads the *current*
+  // value (the user may toggle Reduce Motion during the 3s the toast is up).
+  const reduceMotionRef = useRef(false);
+  // Guards against setState after unmount from an in-flight dismiss animation.
+  const mountedRef = useRef(true);
 
   // EXPERIENCE.md accessibility note: "Reduce Motion: skip watched-confirmation
   // and reward animations; show the result immediately."
@@ -91,21 +98,20 @@ export default function AddScreen() {
     };
   }, []);
 
-  // Tap a result: commit the watch immediately (AC6, watched_at = now), then
-  // show the soft confirmation as a bottom toast. logWatch resolves from the
-  // local write alone — it never awaits the network — so this works
-  // regardless of network state (AC2). The toast auto-dismisses and never
-  // blocks further search/scroll (FR14).
-  const handleLog = useCallback(
-    (item: CatalogResult) => {
-      void logWatch({ tmdbId: item.tmdbId, mediaType: item.mediaType });
-      // Optimistic: this item is "already watched" the instant the tap fires,
-      // not once the getLoggedKeys round-trip below eventually confirms it.
-      setLoggedKeys((prev) => new Set(prev).add(watchKey(item.tmdbId, item.mediaType)));
+  // Keep the ref in lockstep so deferred closures see the live value.
+  useEffect(() => {
+    reduceMotionRef.current = reduceMotion;
+  }, [reduceMotion]);
 
+  // Show the transient bottom toast (slide up + fade; Reduce Motion snaps it
+  // in/out instead). Auto-dismisses and never blocks further search/scroll
+  // (FR14). Reads Reduce Motion via the ref so a toggle mid-toast is honored.
+  const showToast = useCallback(
+    (message: string) => {
+      setToastMsg(message);
       setToastMounted(true);
       toastAnim.stopAnimation();
-      if (reduceMotion) {
+      if (reduceMotionRef.current) {
         toastAnim.setValue(1);
       } else {
         toastAnim.setValue(0);
@@ -119,8 +125,8 @@ export default function AddScreen() {
 
       if (confirmationTimer.current) clearTimeout(confirmationTimer.current);
       confirmationTimer.current = setTimeout(() => {
-        if (reduceMotion) {
-          setToastMounted(false);
+        if (reduceMotionRef.current) {
+          if (mountedRef.current) setToastMounted(false);
           return;
         }
         Animated.timing(toastAnim, {
@@ -129,18 +135,41 @@ export default function AddScreen() {
           easing: Easing.in(Easing.cubic),
           useNativeDriver: true,
         }).start(({ finished }) => {
-          if (finished) setToastMounted(false);
+          if (finished && mountedRef.current) setToastMounted(false);
         });
       }, CONFIRMATION_DISMISS_MS);
     },
-    [reduceMotion, toastAnim],
+    [toastAnim],
+  );
+
+  // Tap a result: commit the watch (AC6, watched_at = now), and only mark it
+  // "already watched" + show the confirmation once `logWatch` actually resolves
+  // — the local outbox write IS the commit (AC1/AC2), so the confirmation must
+  // attest it, never run ahead of it. A failed local write shows the failure
+  // copy instead of a false success. logWatch resolves from the local write
+  // alone (never the network), so this works regardless of connectivity (AC2).
+  const handleLog = useCallback(
+    (item: CatalogResult) => {
+      logWatch({ tmdbId: item.tmdbId, mediaType: item.mediaType })
+        .then(() => {
+          setLoggedKeys((prev) => new Set(prev).add(watchKey(item.tmdbId, item.mediaType)));
+          showToast(COPY_LOGGED);
+        })
+        .catch((err) => {
+          console.warn('logWatch failed', err);
+          showToast(COPY_LOG_FAILED);
+        });
+    },
+    [showToast],
   );
 
   useEffect(() => {
     return () => {
+      mountedRef.current = false;
       if (confirmationTimer.current) clearTimeout(confirmationTimer.current);
+      toastAnim.stopAnimation();
     };
-  }, []);
+  }, [toastAnim]);
 
   const runSearch = useCallback(async (raw: string) => {
     const trimmed = raw.trim();
@@ -258,7 +287,7 @@ export default function AddScreen() {
           pointerEvents="none"
           accessibilityLiveRegion="polite"
         >
-          <Text style={styles.toastText}>{COPY_LOGGED}</Text>
+          <Text style={styles.toastText}>{toastMsg}</Text>
         </Animated.View>
       )}
     </Screen>
