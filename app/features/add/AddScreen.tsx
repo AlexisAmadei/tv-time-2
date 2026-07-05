@@ -23,7 +23,6 @@ import {
   Animated,
   Easing,
   FlatList,
-  Image,
   Pressable,
   StyleSheet,
   Text,
@@ -31,19 +30,17 @@ import {
   View,
 } from 'react-native';
 
-import { Ionicons } from '@expo/vector-icons';
-import { LinearGradient } from 'expo-linear-gradient';
+import { useNavigation } from '@react-navigation/native';
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 
 import { Screen } from '../../components/Screen';
+import { TitleCard } from '../../components/TitleCard';
 import { useTheme } from '../../theme/ThemeProvider';
 import type { Theme } from '../../theme/tokens';
-import {
-  CatalogError,
-  posterUrl,
-  searchCatalog,
-  type CatalogResult,
-} from '../../data/catalog';
+import { CatalogError, searchCatalog, type CatalogResult } from '../../data/catalog';
 import { getLoggedKeys, logWatch, watchKey } from '../../data/watchLog';
+import { addToWatchlist, getWatchlistKeys, removeFromWatchlist } from '../../data/watchlist';
+import type { AddStackParamList } from '../../navigation/AddStack';
 
 const DEBOUNCE_MS = 300;
 const CONFIRMATION_DISMISS_MS = 3000;
@@ -53,12 +50,19 @@ const COPY_EMPTY = 'Hmm, nothing by that name. Try another spelling or title?';
 const COPY_ERROR = "Couldn't reach the catalog — check your connection and try again.";
 const COPY_LOGGED = 'Logged — nice one.';
 const COPY_LOG_FAILED = "Couldn't save that — try again.";
+// AC4: warm add-confirmation (one emoji max — none here; UX-DR20). "Remove" stays
+// quiet (AC4 only specifies the add confirmation). Failure reuses the log tone.
+const COPY_WATCHLISTED = "We'll tell you when it's time.";
+const COPY_WATCHLIST_REMOVED = 'Removed from watchlist.';
+const COPY_WATCHLIST_FAILED = "Couldn't save that — try again.";
 
 type Phase = 'idle' | 'loading' | 'results' | 'empty' | 'error';
 
 export default function AddScreen() {
   const theme = useTheme();
   const styles = makeStyles(theme);
+  const navigation =
+    useNavigation<NativeStackNavigationProp<AddStackParamList, 'AddSearch'>>();
 
   const [query, setQuery] = useState('');
   const [phase, setPhase] = useState<Phase>('idle');
@@ -70,6 +74,10 @@ export default function AddScreen() {
   // outbox + synced `watches` after each search resolves (non-blocking), plus
   // optimistically as soon as a tap logs a new one.
   const [loggedKeys, setLoggedKeys] = useState<Set<string>>(new Set());
+  // `${mediaType}:${tmdbId}` keys already on the watchlist — looked up against
+  // the server after each search resolves (non-blocking), plus flipped
+  // optimistically the instant a ❤️ tap toggles one.
+  const [watchlistKeys, setWatchlistKeys] = useState<Set<string>>(new Set());
   const [reduceMotion, setReduceMotion] = useState(false);
 
   // Monotonic request id: only the latest in-flight search may commit its result,
@@ -163,6 +171,57 @@ export default function AddScreen() {
     [showToast],
   );
 
+  // Tap ❤️: optimistic toggle (Story 2.3). Flip the key immediately (add or
+  // remove based on current membership), then persist via watchlist.ts; on
+  // failure, roll the key back and show the failure copy. This mirrors
+  // handleLog's optimism — the honest tradeoff: a failed write flips the heart
+  // back rather than lying that it saved. Idempotency is DB-guaranteed (unique
+  // index), so a racing double-tap can't duplicate a row.
+  const handleToggleWatchlist = useCallback(
+    (item: CatalogResult) => {
+      const key = watchKey(item.tmdbId, item.mediaType);
+      const wasWatchlisted = watchlistKeys.has(key);
+      // Optimistic flip.
+      setWatchlistKeys((prev) => {
+        const next = new Set(prev);
+        if (wasWatchlisted) next.delete(key);
+        else next.add(key);
+        return next;
+      });
+
+      const op = wasWatchlisted
+        ? removeFromWatchlist(item.tmdbId, item.mediaType)
+        : addToWatchlist(item.tmdbId, item.mediaType);
+      op.then(() => {
+        showToast(wasWatchlisted ? COPY_WATCHLIST_REMOVED : COPY_WATCHLISTED);
+      }).catch((err) => {
+        console.warn('watchlist toggle failed', err);
+        // Roll back to the pre-tap membership.
+        setWatchlistKeys((prev) => {
+          const next = new Set(prev);
+          if (wasWatchlisted) next.add(key);
+          else next.delete(key);
+          return next;
+        });
+        showToast(COPY_WATCHLIST_FAILED);
+      });
+    },
+    [watchlistKeys, showToast],
+  );
+
+  // Tap the card body (not the log button) → open title detail (Story 2.2).
+  // This is the one behavior change to this screen: the row was left inert in
+  // 1.5 "reserved for Epic 2's title-detail navigation" — this cashes it in.
+  const handleOpenDetail = useCallback(
+    (item: CatalogResult) => {
+      navigation.navigate('TitleDetail', {
+        tmdbId: item.tmdbId,
+        mediaType: item.mediaType,
+      });
+    },
+    [navigation],
+  );
+
   useEffect(() => {
     return () => {
       mountedRef.current = false;
@@ -194,6 +253,14 @@ export default function AddScreen() {
           setLoggedKeys((prev) => new Set([...prev, ...keys]));
         })
         .catch(() => {}); // best-effort — a failed lookup just shows no ticks yet
+      // Same non-blocking, superseded-guarded, best-effort pattern for the
+      // watchlist hearts (Story 2.3) — never gate the results list on it (FR14).
+      getWatchlistKeys(found)
+        .then((keys) => {
+          if (seq !== requestSeq.current) return; // superseded
+          setWatchlistKeys((prev) => new Set([...prev, ...keys]));
+        })
+        .catch(() => {});
     } catch (err) {
       if (seq !== requestSeq.current) return; // superseded
       setErrorMsg(err instanceof CatalogError ? err.message : COPY_ERROR);
@@ -256,10 +323,11 @@ export default function AddScreen() {
             renderItem={({ item }) => (
               <TitleCard
                 item={item}
-                theme={theme}
-                styles={styles}
+                onPress={handleOpenDetail}
                 onLog={handleLog}
                 logged={loggedKeys.has(watchKey(item.tmdbId, item.mediaType))}
+                onToggleWatchlist={handleToggleWatchlist}
+                watchlisted={watchlistKeys.has(watchKey(item.tmdbId, item.mediaType))}
               />
             )}
             keyboardShouldPersistTaps="handled"
@@ -293,117 +361,6 @@ export default function AddScreen() {
     </Screen>
   );
 }
-
-/**
- * A single result — the title-card pattern. The row itself stays inert (the
- * whole-card tap is reserved for title-detail navigation, Epic 2 — see
- * EXPERIENCE.md's "Any poster/card tap → Title detail" surface mapping); the
- * log action lives on its own icon button (Story 1.5, AC6) so it never
- * collides with that future navigation.
- */
-function TitleCard({
-  item,
-  theme,
-  styles,
-  onLog,
-  logged,
-}: {
-  item: CatalogResult;
-  theme: Theme;
-  styles: ReturnType<typeof makeStyles>;
-  onLog: (item: CatalogResult) => void;
-  logged: boolean;
-}) {
-  const typeLabel = item.mediaType === 'tv' ? 'TV' : 'Film';
-  const meta = [item.year, typeLabel].filter(Boolean).join(' · ');
-  return (
-    <View
-      style={styles.card}
-      accessible
-      accessibilityLabel={`${item.title}, ${item.year ?? 'year unknown'}, ${typeLabel}${logged ? ', already watched' : ''}`}
-    >
-      <Poster posterPath={item.posterPath} theme={theme} styles={styles} />
-      <View style={styles.cardText}>
-        <Text style={styles.cardTitle} numberOfLines={2}>
-          {item.title}
-        </Text>
-        <Text style={styles.cardMeta}>{meta}</Text>
-      </View>
-      {/* Filled + "already watched" don't disable the button — logging a
-          rewatch is legitimate (AD-3: each watch is its own atomic row). */}
-      <Pressable
-        onPress={() => onLog(item)}
-        style={({ pressed }) => [styles.logButton, pressed && styles.logButtonPressed]}
-        hitSlop={8}
-        accessibilityRole="button"
-        accessibilityLabel={logged ? `Log another watch of ${item.title}` : `Log ${item.title} as watched`}
-      >
-        <Ionicons
-          name={logged ? 'checkmark-circle' : 'checkmark-circle-outline'}
-          size={28}
-          color={theme.colors.primary}
-        />
-      </Pressable>
-    </View>
-  );
-}
-
-/**
- * Poster with a cool→dark placeholder fallback. Shows the placeholder while the
- * image loads, when there is no poster path, and if the load fails — never a
- * broken image (FR9). The placeholder layers a translucent `cool` wash over the
- * sunken surface to evoke the design's cool→dark gradient without a native
- * gradient dependency.
- */
-function Poster({
-  posterPath,
-  theme,
-  styles,
-}: {
-  posterPath: string | null;
-  theme: Theme;
-  styles: ReturnType<typeof makeStyles>;
-}) {
-  const uri = posterUrl(posterPath);
-  const [failed, setFailed] = useState(false);
-  const [loaded, setLoaded] = useState(false);
-
-  const showPlaceholder = !uri || failed || !loaded;
-
-  return (
-    <View style={styles.poster}>
-      {showPlaceholder && (
-        <LinearGradient
-          colors={[theme.colors.cool, theme.colors.surfaceBase]}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={styles.posterPlaceholder}
-        >
-          <Ionicons
-            name="film-outline"
-            size={22}
-            color={theme.colors.inkSecondary}
-            style={styles.posterGlyph}
-          />
-        </LinearGradient>
-      )}
-      {uri && !failed && (
-        <Image
-          source={{ uri }}
-          style={styles.posterImage}
-          onLoad={() => setLoaded(true)}
-          onError={() => setFailed(true)}
-          accessibilityIgnoresInvertColors
-        />
-      )}
-    </View>
-  );
-}
-
-const POSTER_W = 60;
-const POSTER_H = 90;
-
-const absoluteFill = { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0 } as const;
 
 function makeStyles(theme: Theme) {
   const { colors, type, spacing, radius } = theme;
@@ -456,43 +413,5 @@ function makeStyles(theme: Theme) {
     },
     toastText: { ...type.label, color: colors.primary },
     listContent: { paddingBottom: spacing.xl, gap: spacing.md },
-    card: {
-      flexDirection: 'row',
-      backgroundColor: colors.surfaceRaised,
-      borderRadius: radius.md,
-      padding: spacing.md,
-      gap: spacing.md,
-      minHeight: POSTER_H + spacing.md * 2,
-    },
-    // Dedicated log-action hit target — 44pt minimum touch size (platform
-    // guideline), even though the glyph itself is smaller.
-    logButton: {
-      width: 44,
-      height: 44,
-      alignItems: 'center',
-      justifyContent: 'center',
-      borderRadius: radius.pill,
-    },
-    logButtonPressed: { backgroundColor: colors.surfaceSunken },
-    poster: {
-      width: POSTER_W,
-      height: POSTER_H,
-      borderRadius: radius.sm,
-      overflow: 'hidden',
-      backgroundColor: colors.surfaceSunken,
-    },
-    posterImage: { ...absoluteFill, width: POSTER_W, height: POSTER_H },
-    // The cool→dark gradient poster placeholder (DESIGN.md Components/title-card),
-    // shown while loading, when there's no poster, and on image error (FR9).
-    posterPlaceholder: {
-      ...absoluteFill,
-      alignItems: 'center',
-      justifyContent: 'center',
-    },
-    // A small, muted glyph centered in the placeholder — never color-only signal.
-    posterGlyph: { opacity: 0.7 },
-    cardText: { flex: 1, justifyContent: 'center', gap: spacing.xs },
-    cardTitle: { ...type.cardTitle, color: colors.inkPrimary },
-    cardMeta: { ...type.meta, color: colors.inkSecondary },
   });
 }

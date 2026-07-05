@@ -41,8 +41,15 @@
 # - Retrospective appends its action items to action_items; sprint-status surfaces open ones
 
 generated: 2026-07-02
-last_updated: 2026-07-05
+last_updated: 2026-07-06
+# story 2.3 started 2026-07-06: status → in-progress
+# story 2.1 marked done 2026-07-05
+# story 2.2 started 2026-07-05: status → in-progress
+# story 2.2 implemented 2026-07-05: catalog-title fn + detail screen + AddStack (native-stack dep) + shared TitleCard; tsc/export clean; on-device manual pass outstanding → review
 # code review of story 1.5 completed 2026-07-05: 7 patches applied, status → done
+# story 2.1 verified 2026-07-05: all 4 ACs already satisfied by 1.4/1.5/1.6 code, no changes needed, status → review
+# story 2.2 drafted 2026-07-05: ready-for-dev
+# story 2.3 drafted 2026-07-06: watchlist_items table + direct-PostgREST watchlist.ts + ❤️ on TitleCard/detail; status → ready-for-dev
 project: tv-time-2
 project_key: NOKEY
 tracking_system: file-system
@@ -58,10 +65,10 @@ development_status:
   1-6-prove-the-private-by-default-wall: done
   epic-1-retrospective: optional
 
-  epic-2: backlog
-  2-1-full-search-experience: backlog
-  2-2-title-detail-for-films-and-shows: backlog
-  2-3-save-a-title-to-the-watchlist: backlog
+  epic-2: in-progress
+  2-1-full-search-experience: done
+  2-2-title-detail-for-films-and-shows: done
+  2-3-save-a-title-to-the-watchlist: in-progress
   2-4-watchlist-shelf-on-home: backlog
   epic-2-retrospective: optional
 

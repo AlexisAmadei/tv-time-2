@@ -5,7 +5,10 @@
 // supabase client; supabase-js auto-attaches the session bearer + apikey, so we
 // never hand-build headers or a second client.
 //
-// Scope wall (1.4): SEARCH only. Title-detail (2.2) and logging (1.5) are later.
+// Scope wall (1.4): SEARCH only. Logging (1.5) is elsewhere.
+// Title-detail (2.2) extends this file below — it owns the same proxy boundary
+// and CatalogError/envelope-parsing, so `fetchTitleDetail` reuses them rather
+// than re-forking a second data module.
 
 import { isErrorEnvelope } from '@tv-time-2/shared-types';
 
@@ -18,6 +21,48 @@ export interface CatalogResult {
   title: string;
   year: string | null;
   posterPath: string | null;
+}
+
+/** One episode of a season (tv only) — mirror of catalog-title's payload. */
+export interface EpisodeDetail {
+  episodeNumber: number;
+  name: string;
+  airDate: string | null;
+}
+
+/** A season with its episode list (tv only). */
+export interface SeasonDetail {
+  seasonNumber: number;
+  name: string;
+  episodes: EpisodeDetail[];
+}
+
+/**
+ * The rich title-detail payload (Story 2.2) — camelCase mirror of the
+ * `catalog-title` function's output. `seasons` is present for shows, absent for
+ * films. A cached "basics" fallback (AC4) may arrive as a partial payload
+ * (thin CatalogResult shape upgraded to this type) — `synopsis`/`seasons` can be
+ * null/absent, so the UI must tolerate a partial shape.
+ */
+export interface TitleDetail {
+  tmdbId: number;
+  mediaType: 'movie' | 'tv';
+  title: string;
+  year: string | null;
+  posterPath: string | null;
+  synopsis: string | null;
+  seasons?: SeasonDetail[];
+}
+
+/**
+ * A resolved title-detail request. `cached` marks a row served from the cache;
+ * `soft` marks the AC4 soft-fail path (TMDB was unreachable but cached basics
+ * were available) — the UI shows a "showing saved info" affordance for it.
+ */
+export interface TitleDetailResult {
+  detail: TitleDetail;
+  cached: boolean;
+  soft: boolean;
 }
 
 // TMDB image CDN. w185 is the poster size the title-card uses. The CDN is
@@ -91,4 +136,74 @@ export async function searchCatalog(query: string): Promise<CatalogResult[]> {
 
   const results = data?.results;
   return Array.isArray(results) ? (results as CatalogResult[]) : [];
+}
+
+// The verbatim AC4 hard-failure copy (fetch failed, nothing cached). Used for
+// network/timeout failures the function never got to answer, so the detail
+// screen shows the same warm retry line as a 502 envelope would carry.
+const DETAIL_UNAVAILABLE = "We couldn't load this right now.";
+
+// Detail needs a longer bound than search: the function fetches `/tv/{id}` and
+// then a bounded fan-out of per-season calls, each up to the server's 8s TMDB
+// timeout — so a large show's cold fetch legitimately runs well past the 10s
+// search bound. Race high enough not to abort a still-working request, but
+// still bounded so a truly stalled response reaches the error/retry state.
+const DETAIL_INVOKE_TIMEOUT_MS = 20000;
+
+/**
+ * Fetch a title's full detail (Story 2.2) through the proxied `catalog-title`
+ * function. Mirrors {@link searchCatalog}'s pattern exactly: the one supabase
+ * client, an INVOKE_TIMEOUT_MS race, envelope-parsing via `isErrorEnvelope`.
+ *
+ * Resolves to a {@link TitleDetailResult} (which flags cache/soft-fail state so
+ * the UI can show AC4's "cached basics" affordance). Throws {@link CatalogError}
+ * — carrying the function's warm copy + code — only on a hard failure with
+ * nothing cached, so the screen can show the retry state (AC4).
+ */
+export async function fetchTitleDetail(
+  tmdbId: number,
+  mediaType: 'movie' | 'tv',
+): Promise<TitleDetailResult> {
+  // Race an invoke against a timeout, clearing the timer once the race settles
+  // so a won race never leaves a dangling pending rejection alive.
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const timeout = new Promise<never>((_, reject) => {
+    timer = setTimeout(
+      () => reject(new CatalogError(DETAIL_UNAVAILABLE, 'catalog_timeout')),
+      DETAIL_INVOKE_TIMEOUT_MS,
+    );
+  });
+
+  try {
+    const { data, error } = await Promise.race([
+      supabase.functions.invoke('catalog-title', { body: { tmdbId, mediaType } }),
+      timeout,
+    ]);
+
+    if (error) {
+      const context = (error as { context?: unknown }).context;
+      if (context instanceof Response) {
+        try {
+          const body = await context.json();
+          if (isErrorEnvelope(body)) throw new CatalogError(body.message, body.code);
+        } catch (parseErr) {
+          if (parseErr instanceof CatalogError) throw parseErr;
+          // fall through to the generic message
+        }
+      }
+      throw new CatalogError(DETAIL_UNAVAILABLE, 'catalog_unavailable');
+    }
+
+    const detail = data?.detail;
+    if (!detail || typeof detail !== 'object') {
+      throw new CatalogError(DETAIL_UNAVAILABLE, 'catalog_unavailable');
+    }
+    return {
+      detail: detail as TitleDetail,
+      cached: Boolean(data?.cached),
+      soft: Boolean(data?.soft),
+    };
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
 }

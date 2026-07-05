@@ -12,9 +12,9 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 
 import { useTheme } from '../theme/ThemeProvider';
 import BottomTabBar from './BottomTabBar';
+import AddStack from './AddStack';
 import HomeScreen from '../features/home/HomeScreen';
 import DiaryScreen from '../features/diary/DiaryScreen';
-import AddScreen from '../features/add/AddScreen';
 import FeedScreen from '../features/feed/FeedScreen';
 import ProfileScreen from '../features/profile/ProfileScreen';
 
@@ -59,8 +59,9 @@ export default function AppShell({ session }: { session: Session }) {
       >
         <Tab.Screen name="Home" component={HomeScreen} options={{ title: 'Home' }} />
         <Tab.Screen name="Diary" component={DiaryScreen} options={{ title: 'Diary' }} />
-        {/* The (+) fast-add slot. Routes to the `add` stub this story (flow is 1.4/1.5). */}
-        <Tab.Screen name="Add" component={AddScreen} options={{ title: 'Add' }} />
+        {/* The (+) fast-add slot. Wraps a stack (2.2) so a tapped result can push
+            the title-detail screen; AddScreen stays the initial route. */}
+        <Tab.Screen name="Add" component={AddStack} options={{ title: 'Add' }} />
         <Tab.Screen name="Feed" component={FeedScreen} options={{ title: 'Feed' }} />
         {/* Labeled "You" in the UI; route stays `Profile`. Holds temporary sign-out. */}
         <Tab.Screen name="Profile" options={{ title: 'You' }}>
