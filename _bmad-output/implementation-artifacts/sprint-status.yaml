@@ -55,7 +55,7 @@ development_status:
   1-3-themed-app-shell-with-bottom-navigation-dark-mode: done
   1-4-search-a-real-title-through-the-proxied-catalog: done
   1-5-log-a-watch-local-first-surviving-a-network-drop: done
-  1-6-prove-the-private-by-default-wall: ready-for-dev
+  1-6-prove-the-private-by-default-wall: done
   epic-1-retrospective: optional
 
   epic-2: backlog

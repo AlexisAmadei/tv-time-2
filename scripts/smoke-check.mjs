@@ -265,6 +265,205 @@ if (anonKey) {
   }
 }
 
+// 8. Deny-by-default audit — generalized, covers every public-schema table,
+// present and future (Story 1.6 / AC3, AC6) -----------------------------------
+// Unlike checks 4/6/7 above (each hardcoded to one table), this queries the
+// catalog directly so a future migration that adds a table with RLS off, or
+// that forgets the anon/authenticated revoke-then-grant boilerplate, fails
+// here automatically — no edit to this script required.
+function runPsql(sql) {
+  return execFileSync(
+    'docker',
+    [
+      'compose',
+      '-f',
+      composeFile,
+      '--project-directory',
+      supabaseDir,
+      'exec',
+      '-T',
+      'db',
+      'psql',
+      '-U',
+      'postgres',
+      '-d',
+      'postgres',
+      '-t',
+      '-A',
+      '-c',
+      sql,
+    ],
+    { encoding: 'utf8' },
+  );
+}
+
+// Sanity check that the audit queries actually ran against a real catalog
+// (not a silently empty/malformed psql response) before trusting a zero-row
+// result as "no violations" — `watches` is guaranteed to exist by this point
+// in the migration chain (0003_watches.sql), so its absence here means the
+// audit itself didn't run meaningfully, not that everything passed.
+function assertAuditRan(sanityOut, auditName) {
+  const tables = sanityOut
+    .split('\n')
+    .map((l) => l.trim())
+    .filter(Boolean);
+  if (!tables.includes('watches')) {
+    throw new Error(
+      `${auditName}: sanity check failed — expected "watches" among public tables but got ${JSON.stringify(tables)}; treating this as an audit failure, not a pass.`,
+    );
+  }
+}
+
+try {
+  const noRlsOut = runPsql(
+    "select tablename from pg_tables where schemaname = 'public' and rowsecurity = false;",
+  );
+  const allTablesOut = runPsql("select tablename from pg_tables where schemaname = 'public';");
+  assertAuditRan(allTablesOut, 'RLS-enabled-everywhere audit');
+  const noRlsTables = noRlsOut
+    .split('\n')
+    .map((l) => l.trim())
+    .filter(Boolean);
+  if (noRlsTables.length === 0) {
+    ok('Every public-schema table has row level security enabled.');
+  } else {
+    for (const t of noRlsTables) fail(`Table "${t}" does not have row level security enabled.`);
+  }
+} catch (err) {
+  fail(`RLS-enabled-everywhere audit failed: ${err.message}`);
+}
+
+try {
+  const anonGrantsOut = runPsql(
+    "select table_name from information_schema.role_table_grants where grantee = 'anon' and table_schema = 'public';",
+  );
+  const allTablesOut = runPsql("select tablename from pg_tables where schemaname = 'public';");
+  assertAuditRan(allTablesOut, 'anon-has-nothing audit');
+  const anonGrantTables = anonGrantsOut
+    .split('\n')
+    .map((l) => l.trim())
+    .filter(Boolean);
+  if (anonGrantTables.length === 0) {
+    ok('The anon role has no grants on any public-schema table.');
+  } else {
+    for (const t of anonGrantTables) fail(`Table "${t}" grants privileges to anon — deny-by-default regression.`);
+  }
+} catch (err) {
+  fail(`anon-has-nothing audit failed: ${err.message}`);
+}
+
+// 9. Cross-user RLS wall proof — a populated row is invisible to a second,
+// real authenticated user (Story 1.6 / AC2, AC4, AC7) -------------------------
+// Checks 4/6/7 prove *denial* for anon (no grant at all, or an empty table).
+// This proves *filtering*: user B has a real SELECT grant and is a valid
+// authenticated user, so PostgREST returns 200 — RLS is what silently empties
+// the result. A non-empty array here is the actual privacy bug this story
+// exists to prevent.
+if (anonKey) {
+  const SMOKE_A = { email: 'smoke-test-a@tv-time-2.invalid', username: 'smoketestusera' };
+  const SMOKE_B = { email: 'smoke-test-b@tv-time-2.invalid', username: 'smoketestuserb' };
+  const SMOKE_PASSWORD = 'Sm0ke-Test-Password!';
+  // Fixed literal UUID (not freshly generated per run) so reruns upsert the
+  // same row instead of erroring on a PK conflict or accumulating rows.
+  const SMOKE_WATCH_ID = '00000000-0000-0000-0000-00000000c0de';
+
+  async function getOrCreateSession({ email, username }) {
+    const signInRes = await fetch(`${baseUrl}/auth/v1/token?grant_type=password`, {
+      method: 'POST',
+      headers: { apikey: anonKey, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password: SMOKE_PASSWORD }),
+      signal: AbortSignal.timeout(5000),
+    });
+    if (signInRes.ok) {
+      const session = await signInRes.json();
+      if (!session?.access_token || !session?.user?.id) {
+        throw new Error(
+          `sign-in for ${email} returned HTTP ${signInRes.status} but no usable session (missing access_token/user.id).`,
+        );
+      }
+      return session;
+    }
+
+    // Local dev has ENABLE_EMAIL_AUTOCONFIRM=true, so signup returns a usable
+    // session directly — no email/OTP round-trip needed.
+    const signUpRes = await fetch(`${baseUrl}/auth/v1/signup`, {
+      method: 'POST',
+      headers: { apikey: anonKey, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        email,
+        password: SMOKE_PASSWORD,
+        data: { username, display_name: username },
+      }),
+      signal: AbortSignal.timeout(5000),
+    });
+    if (!signUpRes.ok) {
+      throw new Error(`sign-in and sign-up both failed for ${email} (signup HTTP ${signUpRes.status})`);
+    }
+    const session = await signUpRes.json();
+    if (!session?.access_token || !session?.user?.id) {
+      throw new Error(
+        `sign-up for ${email} returned HTTP ${signUpRes.status} but no usable session (missing access_token/user.id) — check ENABLE_EMAIL_AUTOCONFIRM.`,
+      );
+    }
+    return session;
+  }
+
+  try {
+    const sessionA = await getOrCreateSession(SMOKE_A);
+    const sessionB = await getOrCreateSession(SMOKE_B);
+
+    // As user A: upsert a fixed-id watch row (Prefer: resolution=merge-duplicates
+    // = upsert-by-PK, the exact idempotency mechanism Story 1.5 uses).
+    const insertRes = await fetch(`${baseUrl}/rest/v1/watches`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${sessionA.access_token}`,
+        apikey: anonKey,
+        'Content-Type': 'application/json',
+        Prefer: 'resolution=merge-duplicates',
+      },
+      body: JSON.stringify({
+        id: SMOKE_WATCH_ID,
+        // RLS insert policy is `user_id = auth.uid()` — the client must supply
+        // it explicitly, same as app/data/watchSync.ts does; there is no
+        // default or trigger that fills it in.
+        user_id: sessionA.user.id,
+        tmdb_id: 0,
+        media_type: 'movie',
+        watched_at: new Date().toISOString(),
+      }),
+      signal: AbortSignal.timeout(5000),
+    });
+
+    if (!insertRes.ok) {
+      const body = await insertRes.text().catch(() => '<unreadable body>');
+      fail(
+        `Cross-user RLS check: user A could not upsert the smoke-test watch row (HTTP ${insertRes.status}): ${body}`,
+      );
+    } else {
+      // As user B: query that exact row by id. Do NOT delete it afterwards —
+      // leaving it in place (sign-in-or-signup + upsert-by-fixed-id) is what
+      // keeps this check idempotent across reruns.
+      const readRes = await fetch(`${baseUrl}/rest/v1/watches?select=id&id=eq.${SMOKE_WATCH_ID}`, {
+        headers: { Authorization: `Bearer ${sessionB.access_token}`, apikey: anonKey },
+        signal: AbortSignal.timeout(5000),
+      });
+      const rows = readRes.ok ? await readRes.json() : null;
+      if (readRes.status === 200 && Array.isArray(rows) && rows.length === 0) {
+        ok('Cross-user RLS wall holds: user B cannot read user A\'s populated watch row (HTTP 200, 0 rows).');
+      } else {
+        fail(
+          `Cross-user RLS wall FAILED: user B read user A's watch row (HTTP ${readRes.status}, ${
+            Array.isArray(rows) ? rows.length : 'non-array'
+          } rows) — private-by-default regression.`,
+        );
+      }
+    }
+  } catch (err) {
+    fail(`Cross-user RLS check failed: ${err.message}`);
+  }
+}
+
 // Result ----------------------------------------------------------------------
 if (failures > 0) {
   console.error(`\nSmoke check FAILED with ${failures} problem(s).`);
@@ -273,5 +472,6 @@ if (failures > 0) {
 console.log(
   '\nSmoke check passed: stack healthy, gateway accepts the anon key, auth is email-only, ' +
     'anonymous table reads are denied, the catalog proxy rejects unsigned callers, catalog_cache is ' +
-    'deny-by-default, and watches is deny-by-default for anon.',
+    'deny-by-default, watches is deny-by-default for anon, every public-schema table has RLS enabled ' +
+    'with no anon grants, and the cross-user RLS wall holds for a real populated row.',
 );
