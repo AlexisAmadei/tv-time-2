@@ -101,6 +101,29 @@ idempotent / re-runnable (`create ... if not exists`, drop-then-create for
 policies/triggers, `create or replace` for functions), so re-applying the folder
 is safe. A real tracked runner is deferred to a later story.
 
+## TMDB catalog key (Story 1.4)
+
+The catalog is proxied: the `catalog-search` Edge Function is the **sole** caller
+of TMDB and holds the key server-side, so the F-Droid client never ships it
+(AD-6). Get a key at <https://www.themoviedb.org/settings/api> and put it **only**
+in the gitignored `supabase/.env`:
+
+```bash
+# Prefer the v4 "API Read Access Token" (a long JWT); the v3 api_key is a fallback.
+TMDB_ACCESS_TOKEN=eyJ...          # v4 bearer
+TMDB_API_KEY=...                  # v3 key (fallback)
+```
+
+`docker-compose.yml` injects these into the `functions` container. After editing
+`supabase/.env`, recreate the container so it picks them up:
+
+```bash
+docker compose -f docker-compose.yml --project-directory . up -d functions
+```
+
+> ⚠️ Never put a TMDB key in `app/.env*` or any `EXPO_PUBLIC_*` var — that would
+> defeat the proxy. The client reaches the catalog only through the function.
+
 ## Auth & email in local dev
 
 Auth is **Google-free by construction** (AD-12): only email/password and magic

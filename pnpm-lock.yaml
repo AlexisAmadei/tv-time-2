@@ -34,6 +34,9 @@ importers:
       expo-font:
         specifier: ~56.0.7
         version: 56.0.7(expo@56.0.13)(react-native@0.85.3(@babel/core@7.29.7)(@types/react@19.2.17)(react@19.2.3))(react@19.2.3)
+      expo-linear-gradient:
+        specifier: ~56.0.4
+        version: 56.0.4(expo@56.0.13)(react-native@0.85.3(@babel/core@7.29.7)(@types/react@19.2.17)(react@19.2.3))(react@19.2.3)
       expo-status-bar:
         specifier: ~56.0.0
         version: 56.0.4(expo@56.0.13)(react-native@0.85.3(@babel/core@7.29.7)(@types/react@19.2.17)(react@19.2.3))(react@19.2.3)
@@ -1159,6 +1162,13 @@ packages:
     peerDependencies:
       expo: '*'
       react: '*'
+
+  expo-linear-gradient@56.0.4:
+    resolution: {integrity: sha512-KUp1dNSRtuMyiExhf6FJf5YUtmw2cRaPytl10HQi7isj5Yac38udmD55T2tglNYTZlvgT5+oflpyFoH15hmOcw==}
+    peerDependencies:
+      expo: '*'
+      react: '*'
+      react-native: '*'
 
   expo-modules-autolinking@56.0.17:
     resolution: {integrity: sha512-syaWtXg6NrfYk/R8UZ8Kmp6bqorbmEaEdVJUIDlcPbxKHTT2w5kF1fFjrR+GimJFWhh8FMLiDCClR3SU3iVZ8A==}
@@ -3683,6 +3693,12 @@ snapshots:
     dependencies:
       expo: 56.0.13(@babel/core@7.29.7)(@expo/dom-webview@56.0.6)(react-native@0.85.3(@babel/core@7.29.7)(@types/react@19.2.17)(react@19.2.3))(react@19.2.3)(typescript@6.0.3)
       react: 19.2.3
+
+  expo-linear-gradient@56.0.4(expo@56.0.13)(react-native@0.85.3(@babel/core@7.29.7)(@types/react@19.2.17)(react@19.2.3))(react@19.2.3):
+    dependencies:
+      expo: 56.0.13(@babel/core@7.29.7)(@expo/dom-webview@56.0.6)(react-native@0.85.3(@babel/core@7.29.7)(@types/react@19.2.17)(react@19.2.3))(react@19.2.3)(typescript@6.0.3)
+      react: 19.2.3
+      react-native: 0.85.3(@babel/core@7.29.7)(@types/react@19.2.17)(react@19.2.3)
 
   expo-modules-autolinking@56.0.17(typescript@6.0.3):
     dependencies:

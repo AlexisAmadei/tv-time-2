@@ -175,9 +175,76 @@ if (anonKey) {
   }
 }
 
+// 5. Catalog proxy rejects unsigned callers (Story 1.4 / AC4) -----------------
+// The catalog-search Edge Function owns auth itself (Kong does not enforce the
+// apikey for /functions/v1/*). An unauthenticated POST must be refused with 401
+// and the shared {message, code, details} envelope — proving the TMDB proxy
+// never serves an unsigned request.
+if (anonKey) {
+  try {
+    const res = await fetch(`${baseUrl}/functions/v1/catalog-search`, {
+      method: 'POST',
+      headers: { apikey: anonKey, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ query: 'smoke' }),
+      signal: AbortSignal.timeout(5000),
+    });
+    let envelopeOk = false;
+    try {
+      const body = await res.json();
+      envelopeOk =
+        body && typeof body.message === 'string' && typeof body.code === 'string' && 'details' in body;
+    } catch {
+      // non-JSON body — envelope check fails below
+    }
+    if (res.status === 401 && envelopeOk) {
+      ok('Unauthenticated catalog-search denied (HTTP 401, {message,code,details} envelope).');
+    } else if (res.status === 401) {
+      fail(`catalog-search returned 401 but not the {message,code,details} envelope.`);
+    } else {
+      fail(`Unauthenticated catalog-search was NOT denied (HTTP ${res.status}) — proxy auth regression.`);
+    }
+  } catch (err) {
+    fail(`catalog-search auth probe failed: ${err.message}`);
+  }
+}
+
+// 6. catalog_cache is deny-by-default (Story 1.4 / AD-1) ----------------------
+// The disposable catalog cache is reachable only through the Edge Function's
+// service-role key. An anonymous PostgREST read must be denied (RLS on, no
+// anon/authenticated grant), same guarantee as profiles.
+if (anonKey) {
+  try {
+    const res = await fetch(`${baseUrl}/rest/v1/catalog_cache?select=tmdb_id`, {
+      headers: { apikey: anonKey },
+      signal: AbortSignal.timeout(5000),
+    });
+    let rows = null;
+    try {
+      const body = await res.json();
+      if (Array.isArray(body)) rows = body.length;
+    } catch {
+      // non-JSON body is fine — a hard denial
+    }
+    // Assert on status ALONE. Deny-by-default (RLS on, no anon grant) makes
+    // PostgREST return a 4xx permission error — never a 200. A 200 (even an
+    // empty `[]`) means a grant leaked, so an empty table must not false-pass.
+    const denied = res.status >= 400;
+    if (denied) {
+      ok(`Anonymous read of /rest/v1/catalog_cache denied (HTTP ${res.status}).`);
+    } else {
+      fail(`Anonymous read of /rest/v1/catalog_cache was NOT denied (HTTP ${res.status}, ${rows} rows) — RLS/grant regression.`);
+    }
+  } catch (err) {
+    fail(`catalog_cache deny-by-default probe failed: ${err.message}`);
+  }
+}
+
 // Result ----------------------------------------------------------------------
 if (failures > 0) {
   console.error(`\nSmoke check FAILED with ${failures} problem(s).`);
   process.exit(1);
 }
-console.log('\nSmoke check passed: stack healthy, gateway accepts the anon key, auth is email-only, and anonymous table reads are denied.');
+console.log(
+  '\nSmoke check passed: stack healthy, gateway accepts the anon key, auth is email-only, ' +
+    'anonymous table reads are denied, the catalog proxy rejects unsigned callers, and catalog_cache is deny-by-default.',
+);

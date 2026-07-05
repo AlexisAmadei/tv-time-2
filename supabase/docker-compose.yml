@@ -209,6 +209,12 @@ services:
       SUPABASE_SERVICE_ROLE_KEY: ${SERVICE_ROLE_KEY}
       SUPABASE_DB_URL: postgresql://postgres:${POSTGRES_PASSWORD}@${POSTGRES_HOST}:${POSTGRES_PORT}/${POSTGRES_DB}
       VERIFY_JWT: "${FUNCTIONS_VERIFY_JWT}"
+      # TMDB catalog secret — held ONLY server-side (AD-6). The catalog-search
+      # function (Story 1.4) is the sole caller of TMDB; the client never holds
+      # this key. Prefer the v4 read access token (Bearer); the v3 api_key is a
+      # fallback. NEVER expose either as an EXPO_PUBLIC_* / app-side var.
+      TMDB_ACCESS_TOKEN: ${TMDB_ACCESS_TOKEN}
+      TMDB_API_KEY: ${TMDB_API_KEY}
     command: ["start", "--main-service", "/home/deno/functions/main"]
 
   # Local-dev mail catcher (Story 1.2). GoTrue's SMTP_HOST/PORT point here
