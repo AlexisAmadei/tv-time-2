@@ -243,6 +243,28 @@ if (anonKey) {
   }
 }
 
+// 7. watches is deny-by-default for anon, but authenticated CRUD works (Story
+// 1.5 / AD-1) ------------------------------------------------------------
+// Unlike catalog_cache, `watches` IS reachable by authenticated (owner-scoped
+// via RLS) — so this asserts anon denial specifically, the same shape as the
+// catalog_cache guardrail above.
+if (anonKey) {
+  try {
+    const res = await fetch(`${baseUrl}/rest/v1/watches?select=id`, {
+      headers: { apikey: anonKey },
+      signal: AbortSignal.timeout(5000),
+    });
+    const denied = res.status >= 400;
+    if (denied) {
+      ok(`Anonymous read of /rest/v1/watches denied (HTTP ${res.status}).`);
+    } else {
+      fail(`Anonymous read of /rest/v1/watches was NOT denied (HTTP ${res.status}) — RLS/grant regression.`);
+    }
+  } catch (err) {
+    fail(`watches deny-by-default probe failed: ${err.message}`);
+  }
+}
+
 // Result ----------------------------------------------------------------------
 if (failures > 0) {
   console.error(`\nSmoke check FAILED with ${failures} problem(s).`);
@@ -250,5 +272,6 @@ if (failures > 0) {
 }
 console.log(
   '\nSmoke check passed: stack healthy, gateway accepts the anon key, auth is email-only, ' +
-    'anonymous table reads are denied, the catalog proxy rejects unsigned callers, and catalog_cache is deny-by-default.',
+    'anonymous table reads are denied, the catalog proxy rejects unsigned callers, catalog_cache is ' +
+    'deny-by-default, and watches is deny-by-default for anon.',
 );

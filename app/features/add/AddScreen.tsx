@@ -1,10 +1,16 @@
-// Add — the (+) target, now the search-first entry to logging (Story 1.4).
+// Add — the (+) target, the search-first entry to logging (Story 1.4 search,
+// Story 1.5 logging).
 //
 // Search a real title through the proxied catalog. This screen owns the debounce
 // that keeps TMDB from being hammered per keystroke (FR6 "results appear as you
-// type" without the anti-goal). Results are DISPLAY-ONLY in 1.4 (scope wall,
-// AC5): tapping a row navigates nowhere and logs nothing — title-detail is Epic
-// 2, logging is Story 1.5. Rows are honest inert cards, not stubbed links.
+// type" without the anti-goal). Each result carries a dedicated log icon button
+// (checkmark) that commits a watch immediately — the walking-skeleton log
+// action (Story 1.5, AC2/AC6) that lifts 1.4's "results are inert" scope wall.
+// The row itself stays inert (reserved for Epic 2's title-detail navigation).
+// No episode/season picker, no rating/mood/note prompt — those are Epic 3.
+//
+// The soft confirmation is a bottom toast (slide up + fade, RN's built-in
+// Animated — Reduce Motion shows/hides it directly instead).
 //
 // Errors preserve the typed query (AC6/FR8) and show the warm retry copy; a
 // missing/failed poster shows the cool→dark placeholder, never a broken image
@@ -12,7 +18,10 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
+  AccessibilityInfo,
   ActivityIndicator,
+  Animated,
+  Easing,
   FlatList,
   Image,
   Pressable,
@@ -34,12 +43,15 @@ import {
   searchCatalog,
   type CatalogResult,
 } from '../../data/catalog';
+import { getLoggedKeys, logWatch, watchKey } from '../../data/watchLog';
 
 const DEBOUNCE_MS = 300;
+const CONFIRMATION_DISMISS_MS = 3000;
 
 // The warm-voice copy, verbatim from EXPERIENCE.md#State Patterns.
 const COPY_EMPTY = 'Hmm, nothing by that name. Try another spelling or title?';
 const COPY_ERROR = "Couldn't reach the catalog — check your connection and try again.";
+const COPY_LOGGED = 'Logged — nice one.';
 
 type Phase = 'idle' | 'loading' | 'results' | 'empty' | 'error';
 
@@ -51,10 +63,84 @@ export default function AddScreen() {
   const [phase, setPhase] = useState<Phase>('idle');
   const [results, setResults] = useState<CatalogResult[]>([]);
   const [errorMsg, setErrorMsg] = useState(COPY_ERROR);
+  const [toastMounted, setToastMounted] = useState(false);
+  // `${mediaType}:${tmdbId}` keys already logged — checked against the local
+  // outbox + synced `watches` after each search resolves (non-blocking), plus
+  // optimistically as soon as a tap logs a new one.
+  const [loggedKeys, setLoggedKeys] = useState<Set<string>>(new Set());
+  const [reduceMotion, setReduceMotion] = useState(false);
 
   // Monotonic request id: only the latest in-flight search may commit its result,
   // so a slow earlier response can't overwrite a newer one (debounce race).
   const requestSeq = useRef(0);
+  const confirmationTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Drives the toast's slide-up-and-fade — 0 hidden, 1 shown.
+  const toastAnim = useRef(new Animated.Value(0)).current;
+
+  // EXPERIENCE.md accessibility note: "Reduce Motion: skip watched-confirmation
+  // and reward animations; show the result immediately."
+  useEffect(() => {
+    let mounted = true;
+    AccessibilityInfo.isReduceMotionEnabled().then((enabled) => {
+      if (mounted) setReduceMotion(enabled);
+    });
+    const sub = AccessibilityInfo.addEventListener('reduceMotionChanged', setReduceMotion);
+    return () => {
+      mounted = false;
+      sub.remove();
+    };
+  }, []);
+
+  // Tap a result: commit the watch immediately (AC6, watched_at = now), then
+  // show the soft confirmation as a bottom toast. logWatch resolves from the
+  // local write alone — it never awaits the network — so this works
+  // regardless of network state (AC2). The toast auto-dismisses and never
+  // blocks further search/scroll (FR14).
+  const handleLog = useCallback(
+    (item: CatalogResult) => {
+      void logWatch({ tmdbId: item.tmdbId, mediaType: item.mediaType });
+      // Optimistic: this item is "already watched" the instant the tap fires,
+      // not once the getLoggedKeys round-trip below eventually confirms it.
+      setLoggedKeys((prev) => new Set(prev).add(watchKey(item.tmdbId, item.mediaType)));
+
+      setToastMounted(true);
+      toastAnim.stopAnimation();
+      if (reduceMotion) {
+        toastAnim.setValue(1);
+      } else {
+        toastAnim.setValue(0);
+        Animated.timing(toastAnim, {
+          toValue: 1,
+          duration: 220,
+          easing: Easing.out(Easing.cubic),
+          useNativeDriver: true,
+        }).start();
+      }
+
+      if (confirmationTimer.current) clearTimeout(confirmationTimer.current);
+      confirmationTimer.current = setTimeout(() => {
+        if (reduceMotion) {
+          setToastMounted(false);
+          return;
+        }
+        Animated.timing(toastAnim, {
+          toValue: 0,
+          duration: 180,
+          easing: Easing.in(Easing.cubic),
+          useNativeDriver: true,
+        }).start(({ finished }) => {
+          if (finished) setToastMounted(false);
+        });
+      }, CONFIRMATION_DISMISS_MS);
+    },
+    [reduceMotion, toastAnim],
+  );
+
+  useEffect(() => {
+    return () => {
+      if (confirmationTimer.current) clearTimeout(confirmationTimer.current);
+    };
+  }, []);
 
   const runSearch = useCallback(async (raw: string) => {
     const trimmed = raw.trim();
@@ -71,6 +157,14 @@ export default function AddScreen() {
       if (seq !== requestSeq.current) return; // superseded
       setResults(found);
       setPhase(found.length === 0 ? 'empty' : 'results');
+      // Non-blocking: results render immediately; checkmarks fill in once this
+      // resolves. Never gate the results list on it (FR14 "never blocked").
+      getLoggedKeys(found)
+        .then((keys) => {
+          if (seq !== requestSeq.current) return; // superseded
+          setLoggedKeys((prev) => new Set([...prev, ...keys]));
+        })
+        .catch(() => {}); // best-effort — a failed lookup just shows no ticks yet
     } catch (err) {
       if (seq !== requestSeq.current) return; // superseded
       setErrorMsg(err instanceof CatalogError ? err.message : COPY_ERROR);
@@ -130,25 +224,66 @@ export default function AddScreen() {
           <FlatList
             data={results}
             keyExtractor={(item) => `${item.mediaType}:${item.tmdbId}`}
-            renderItem={({ item }) => <TitleCard item={item} theme={theme} styles={styles} />}
+            renderItem={({ item }) => (
+              <TitleCard
+                item={item}
+                theme={theme}
+                styles={styles}
+                onLog={handleLog}
+                logged={loggedKeys.has(watchKey(item.tmdbId, item.mediaType))}
+              />
+            )}
             keyboardShouldPersistTaps="handled"
             contentContainerStyle={styles.listContent}
           />
         )}
       </View>
+
+      {toastMounted && (
+        <Animated.View
+          style={[
+            styles.toast,
+            {
+              opacity: toastAnim,
+              transform: [
+                {
+                  translateY: toastAnim.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: [24, 0],
+                  }),
+                },
+              ],
+            },
+          ]}
+          pointerEvents="none"
+          accessibilityLiveRegion="polite"
+        >
+          <Text style={styles.toastText}>{COPY_LOGGED}</Text>
+        </Animated.View>
+      )}
     </Screen>
   );
 }
 
-/** A single result — the title-card pattern. Inert in 1.4 (AC5): no navigation. */
+/**
+ * A single result — the title-card pattern. The row itself stays inert (the
+ * whole-card tap is reserved for title-detail navigation, Epic 2 — see
+ * EXPERIENCE.md's "Any poster/card tap → Title detail" surface mapping); the
+ * log action lives on its own icon button (Story 1.5, AC6) so it never
+ * collides with that future navigation.
+ */
 function TitleCard({
   item,
   theme,
   styles,
+  onLog,
+  logged,
 }: {
   item: CatalogResult;
   theme: Theme;
   styles: ReturnType<typeof makeStyles>;
+  onLog: (item: CatalogResult) => void;
+  logged: boolean;
 }) {
   const typeLabel = item.mediaType === 'tv' ? 'TV' : 'Film';
   const meta = [item.year, typeLabel].filter(Boolean).join(' · ');
@@ -156,7 +291,7 @@ function TitleCard({
     <View
       style={styles.card}
       accessible
-      accessibilityLabel={`${item.title}, ${item.year ?? 'year unknown'}, ${typeLabel}`}
+      accessibilityLabel={`${item.title}, ${item.year ?? 'year unknown'}, ${typeLabel}${logged ? ', already watched' : ''}`}
     >
       <Poster posterPath={item.posterPath} theme={theme} styles={styles} />
       <View style={styles.cardText}>
@@ -165,6 +300,21 @@ function TitleCard({
         </Text>
         <Text style={styles.cardMeta}>{meta}</Text>
       </View>
+      {/* Filled + "already watched" don't disable the button — logging a
+          rewatch is legitimate (AD-3: each watch is its own atomic row). */}
+      <Pressable
+        onPress={() => onLog(item)}
+        style={({ pressed }) => [styles.logButton, pressed && styles.logButtonPressed]}
+        hitSlop={8}
+        accessibilityRole="button"
+        accessibilityLabel={logged ? `Log another watch of ${item.title}` : `Log ${item.title} as watched`}
+      >
+        <Ionicons
+          name={logged ? 'checkmark-circle' : 'checkmark-circle-outline'}
+          size={28}
+          color={theme.colors.primary}
+        />
+      </Pressable>
     </View>
   );
 }
@@ -258,6 +408,24 @@ function makeStyles(theme: Theme) {
       justifyContent: 'center',
     },
     retryText: { ...type.label, color: colors.inkPrimary },
+    // Transient, non-blocking confirmation (Story 1.5, AC2/AC6) — a bottom
+    // toast overlay, not a modal, so it never gates the search field or
+    // results list (`pointerEvents: 'none'`, absolute, out of layout flow).
+    // Slides up + fades in on tap, reverses on auto-dismiss; Reduce Motion
+    // skips the animation and shows/hides it directly (EXPERIENCE.md).
+    toast: {
+      position: 'absolute',
+      left: 0,
+      right: 0,
+      bottom: spacing.lg,
+      marginHorizontal: spacing.lg,
+      alignItems: 'center',
+      backgroundColor: colors.surfaceRaised,
+      borderRadius: radius.md,
+      paddingHorizontal: spacing.lg,
+      paddingVertical: spacing.md,
+    },
+    toastText: { ...type.label, color: colors.primary },
     listContent: { paddingBottom: spacing.xl, gap: spacing.md },
     card: {
       flexDirection: 'row',
@@ -267,6 +435,16 @@ function makeStyles(theme: Theme) {
       gap: spacing.md,
       minHeight: POSTER_H + spacing.md * 2,
     },
+    // Dedicated log-action hit target — 44pt minimum touch size (platform
+    // guideline), even though the glyph itself is smaller.
+    logButton: {
+      width: 44,
+      height: 44,
+      alignItems: 'center',
+      justifyContent: 'center',
+      borderRadius: radius.pill,
+    },
+    logButtonPressed: { backgroundColor: colors.surfaceSunken },
     poster: {
       width: POSTER_W,
       height: POSTER_H,

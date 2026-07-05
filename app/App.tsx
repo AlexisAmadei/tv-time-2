@@ -1,3 +1,4 @@
+import NetInfo from '@react-native-community/netinfo';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
@@ -5,6 +6,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { checkSupabaseHealth } from './data/supabaseClient';
 import { useSession } from './data/auth';
+import { triggerSync } from './data/watchSync';
 import { ThemeProvider, useTheme } from './theme/ThemeProvider';
 import { useAppFonts } from './theme/fonts';
 import AuthScreen from './features/auth/AuthScreen';
@@ -50,6 +52,19 @@ function AppRoot() {
     return () => {
       cancelled = true;
     };
+  }, []);
+
+  // Sync triggers (Story 1.5, AC3): cold-start/foreground, and a one-time
+  // reconnect listener at the app root. The third trigger (opportunistic,
+  // right after a local logWatch write) lives in watchLog.ts itself.
+  useEffect(() => {
+    void triggerSync().catch(() => {});
+    const unsubscribe = NetInfo.addEventListener((state) => {
+      if (state.isConnected && state.isInternetReachable !== false) {
+        void triggerSync().catch(() => {});
+      }
+    });
+    return unsubscribe;
   }, []);
 
   useEffect(() => {
