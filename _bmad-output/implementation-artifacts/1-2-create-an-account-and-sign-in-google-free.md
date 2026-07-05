@@ -4,7 +4,7 @@ baseline_commit: 58e6308e54e5f5e4aace6fff63b2de36613ce409
 
 # Story 1.2: Create an account and sign in (Google-free)
 
-Status: review
+Status: done
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -52,6 +52,23 @@ so that I have an identity the app can attach my history to — with no Google d
   - [x] Verified all 6 ACs against the live stack: password sign-up → `auth.users` + `public.profiles` row (correct shape) + JWT session; duplicate username (case-insensitive) → HTTP 500 reject; magic-link OTP → Inbucket → `verifyOtp` → session; owner sees only own row; user B cannot read user A's row (RLS → 0 rows); anon request to `/rest/v1/profiles` → HTTP 401 (deny-by-default). Trigger constraints also unit-checked in a rolled-back transaction (dup / bad-format / missing username).
   - [x] Extended `scripts/smoke-check.mjs` with two durable read-only guardrails: check 3 (auth is email-only, no OAuth) and check 4 (anon table read denied), plus `mail` in the health set. `pnpm run verify` green.
   - [x] Left `packages/shared-types` unchanged — generating a `Profile` type is optional (README note says Story 1.5+), the client doesn't read `profiles` yet (only auth), and a hand-written type would risk drift. Deferred to the first story that reads profile data.
+
+### Review Findings
+
+- [x] [Review][Patch] Duplicate-username heuristic regex is overly broad — fixed: use `error.code` (`email_exists`/`user_already_exists`) for GoTrue-distinguished cases, and gate the generic friendly message on `status === 500` (the trigger's opaque failure class) instead of matching on message text alone. [app/features/auth/AuthScreen.tsx]
+- [x] [Review][Patch] `useSession()` has no `.catch` on the initial `getSession()` call and no ordering guard against `onAuthStateChange`; a rejected lookup leaves `loading` stuck `true` forever. Fixed: added `.catch`, plus a `live` flag so a late `getSession()` resolution can't clobber a session already set by `onAuthStateChange`. [app/data/auth.ts]
+- [x] [Review][Patch] Migration runner doesn't apply each file in a single transaction (`psql -1`); a mid-file failure leaves earlier statements in that file already committed, with no tracking table to detect it. Fixed: added `-1`/`--single-transaction` to the `psql` invocation. [supabase/scripts/apply-migrations.mjs]
+- [x] [Review][Patch] `signOut()` is wired directly as a `Pressable` `onPress` with no `.catch`; a rejected sign-out is an unhandled promise rejection. Fixed at the source in `signOut()` itself (now catches and logs) so every call site — including Story 1.3's `ProfileScreen`, which now owns this control — is covered. [app/data/auth.ts]
+- [x] [Review][Patch] `display_name`/`avatar` have no length constraint (unlike `username`) despite being populated via a SECURITY DEFINER trigger from client-controlled sign-up metadata. Fixed: added guarded `CHECK` constraints (100/2048 chars) via an idempotent `DO` block appended to the migration (already applied on the live DB, so `ADD CONSTRAINT` can't use `IF NOT EXISTS`). [supabase/migrations/0001_profiles.sql]
+- [x] [Review][Patch] The new `mail` (Inbucket) service has no explicit `healthcheck:` block, yet `smoke-check.mjs` expects it in the healthy set — relies on an unverified assumption that the base image ships one. Fixed: added an explicit `wget`-based healthcheck (verified `wget` exists in the Alpine-based image and the web root returns HTTP 200). [supabase/docker-compose.yml]
+- [x] [Review][Patch] Smoke-check's AC3/AD-12 guard excludes `phone` and `anonymous_users` from the OAuth-provider failure check, so it would not catch either being accidentally re-enabled — narrower than the story's claimed "permanent assertion." Fixed: added explicit `external.phone === true` / `external.anonymous_users === true` failure checks. [scripts/smoke-check.mjs]
+- [x] [Review][Defer] Raw GoTrue error text shown directly on sign-in/OTP paths, inconsistent with the friendlier sign-up handling [app/features/auth/AuthScreen.tsx] — deferred, pre-existing
+- [x] [Review][Defer] No client-side empty-field validation before submit on sign-in/sign-up [app/features/auth/AuthScreen.tsx] — deferred, pre-existing
+- [x] [Review][Defer] `SignedInScreen` shows the JWT-metadata-snapshot username rather than the live `profiles` row [app/features/auth/SignedInScreen.tsx] — deferred, pre-existing (placeholder screen, replaced in Story 1.3)
+- [x] [Review][Defer] No resend/cooldown affordance once an OTP code has been sent [app/features/auth/AuthScreen.tsx] — deferred, pre-existing
+- [x] [Review][Defer] Testing Standards' cross-user RLS isolation / duplicate-rejection / magic-link e2e checks are verified only via an ad-hoc throwaway script, not committed to `smoke-check.mjs` [scripts/smoke-check.mjs] — deferred, pre-existing (matches project-wide no-automated-test-framework posture)
+- [x] [Review][Defer] No automated safeguard against a future migration forgetting the anon/authenticated revoke-then-grant boilerplate [supabase/migrations/0001_profiles.sql] — deferred, pre-existing (already slated for the 1.6 deny-by-default audit)
+- [x] [Review][Defer] OTP input is missing `textContentType="oneTimeCode"` autofill hint [app/features/auth/AuthScreen.tsx] — deferred, pre-existing
 
 ## Dev Notes
 

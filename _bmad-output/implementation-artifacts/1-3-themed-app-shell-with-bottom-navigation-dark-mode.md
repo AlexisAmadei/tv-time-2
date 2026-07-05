@@ -4,7 +4,7 @@ baseline_commit: fb78937599b3ae806092e2932ceb37e066d16767
 
 # Story 1.3: Themed app shell with bottom navigation (dark mode)
 
-Status: review
+Status: done
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -200,3 +200,11 @@ Testing posture unchanged (no framework yet, per 1.1/1.2): the shell is visual, 
 
 **Removed:**
 - `app/features/auth/SignedInScreen.tsx` (subsumed by the shell; sign-out moved to Profile)
+
+### Review Findings
+
+- [x] [Review][Patch] Sign-out has no loading/error/double-tap guard [app/features/profile/ProfileScreen.tsx:32]
+- [x] [Review][Patch] Username fallback uses `??` so an empty-string username won't fall back to email [app/features/profile/ProfileScreen.tsx:20]
+- [x] [Review][Defer] Tab label can truncate at largest Dynamic Type setting (`numberOfLines={1}` contradicts the AC4/Dev Notes "no clipped/truncated tab labels" requirement) [app/navigation/BottomTabBar.tsx:110] — deferred, not priority
+- [x] [Review][Defer] `userInterfaceStyle` is hard-locked to `"dark"` in app.json, a native/build-time setting the JS `ThemeProvider.mode` can't flip — Story 4.3 (Paper White) will need to touch this file, contradicting the "zero screen edits" framing [app/app.json] — deferred, out of scope for this story (only dark is wired per AC1); revisit in Story 4.3
+- [x] [Review][Defer] `navTheme` spreads react-navigation's `DarkTheme` so its `dark: true` flag never updates even if `theme.mode` changes later — only `colors` is kept in sync [app/navigation/AppShell.tsx:38] — deferred, no effect while only dark mode is wired; revisit alongside the app.json item in Story 4.3
