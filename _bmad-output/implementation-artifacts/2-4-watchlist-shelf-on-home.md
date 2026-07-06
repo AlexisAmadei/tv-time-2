@@ -4,7 +4,7 @@ baseline_commit: 83e7789ba30070ee203e5a9c4d41e8d96198aeee
 
 # Story 2.4: Watchlist shelf on Home
 
-Status: review
+Status: done
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -75,6 +75,15 @@ This story **reads** the `watchlist_items` table (built in 2.3) into a Home shel
   - [x] `npx tsc --noEmit` clean, and `npx expo export --platform android` bundles (the standing automated gates — see Testing Standards). Both are runnable in this environment; run them. **Passed** — `pnpm exec tsc --noEmit` clean (run from `app/`), `npx expo export --platform android` bundled 1040 modules.
   - [~] `node scripts/smoke-check.mjs` — no new table/migration this story, so no *new* audit surface, but re-run it if the local stack is up; otherwise note it as outstanding per the established precedent (2.3 flagged the same environment limitation). *(blocked in this environment — no `supabase/.env` secrets present, so `docker compose up` fails on unset required vars, same limitation 2.3 flagged.)*
   - [~] Manual on-device (flag as outstanding if no emulator available, per every prior story): ❤️ a title from search or detail, switch to Home → it appears in the Watchlist shelf; tap the shelf card → opens title detail; un-❤️ it (from detail or by re-adding elsewhere), return to Home → it disappears from the shelf (proves the focus-refetch); with a fully empty watchlist, Home shows the AC2 copy; a title with no poster art shows the gradient placeholder in the shelf. *(outstanding — no emulator/device in this non-interactive environment; flagged for reviewer, per 1.4–2.3 precedent.)*
+
+### Review Findings
+
+_Code review 2026-07-06 (3-layer adversarial: Blind Hunter, Edge Case Hunter, Acceptance Auditor). No scope-wall violations; all 4 ACs conformant. 3 patches, 1 deferred, 4 dismissed as noise._
+
+- [x] [Review][Patch] All-enrichment-fail renders a false "empty watchlist" — when `getWatchlist()` returns rows but every `fetchTitleDetail` rejects (catalog proxy down, DB up), `resolved` is `[]` and `COPY_EMPTY` shows to a user who has saved titles — the exact false-empty `getWatchlist()` throws to avoid. Key the empty state on `rows.length`, not just enriched count. [app/features/home/HomeScreen.tsx:149-168] (blind+edge+auditor) — **Fixed:** `rows.length > 0 && resolved.length === 0` now routes to the error/retry state instead of the empty copy (and won't nuke an already-painted shelf on a background-refresh failure).
+- [x] [Review][Patch] Focus-refetch has no request-sequence guard — `useFocusEffect` fires `load()` on every focus with only a `mountedRef` guard (stays true across focus cycles); overlapping loads resolve out of order and a stale result can clobber a newer one. Mirror `AddScreen.requestSeq`. [app/features/home/HomeScreen.tsx:141-186] (blind+edge+auditor) — **Fixed:** added a monotonic `requestSeq` ref; each `load()` captures `seq` and bails after every await if superseded.
+- [x] [Review][Patch] Shelf blanks to a spinner on every tab refocus — `load()` unconditionally calls `setPhase('loading')`, so returning to Home unmounts the loaded FlatList and flashes the `ActivityIndicator` (and loses scroll position) even when nothing changed. Keep loaded items visible during a background refetch. [app/features/home/HomeScreen.tsx:142,182-186] (blind+edge) — **Fixed:** `hasLoadedRef` gates the spinner to the first load; focus refetches update in the background.
+- [x] [Review][Defer] Unbounded parallel fan-out — `rows.map(fetchTitleDetail)` fires N concurrent `catalog-title` invokes with no concurrency cap, re-run on every focus; risks thundering-herd for large watchlists [app/features/home/HomeScreen.tsx:145-147] — deferred, spec Dev Notes explicitly punts batching/concurrency-cap to a future optimization ("do not build it now").
 
 ## Dev Notes
 
