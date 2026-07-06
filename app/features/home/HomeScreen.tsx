@@ -62,14 +62,27 @@ export default function HomeScreen({ navigation }: Props) {
     };
   }, []);
 
+  // Monotonic request token: useFocusEffect re-fires load() on every focus and
+  // the Home tab is never unmounted, so two rapid focus cycles can leave two
+  // load()s in flight at once. mountedRef only catches unmount, not supersession
+  // — without a seq guard a slower earlier load can resolve last and clobber the
+  // newer, correct result. Mirrors AddScreen.requestSeq.
+  const requestSeq = useRef(0);
+  // Once we've painted real content, a focus-triggered refetch runs in the
+  // background (keeps the shelf on screen) instead of blanking to a spinner.
+  const hasLoadedRef = useRef(false);
+
   const load = useCallback(async () => {
-    setPhase('loading');
+    const seq = ++requestSeq.current;
+    // Full-screen spinner only on the first load; a focus refetch keeps the
+    // current shelf (and its scroll position) visible and swaps in fresh data.
+    if (!hasLoadedRef.current) setPhase('loading');
     try {
       const rows = await getWatchlist();
       const settled = await Promise.allSettled(
         rows.map((row) => fetchTitleDetail(row.tmdbId, row.mediaType)),
       );
-      if (!mountedRef.current) return;
+      if (!mountedRef.current || seq !== requestSeq.current) return; // superseded
       const resolved: CatalogResult[] = [];
       settled.forEach((result, i) => {
         if (result.status === 'fulfilled') {
@@ -88,12 +101,24 @@ export default function HomeScreen({ navigation }: Props) {
           console.warn('watchlist shelf: failed to resolve title', rows[i], result.reason);
         }
       });
+      // A non-empty watchlist whose enrichment ALL failed is not an empty shelf
+      // — showing the AC2 "empty" copy here would be the exact false-empty
+      // getWatchlist() throws to avoid (DB up, catalog proxy down). Surface the
+      // retry state instead, but never nuke an already-painted shelf over a
+      // transient background-refresh failure.
+      if (rows.length > 0 && resolved.length === 0) {
+        if (!hasLoadedRef.current) setPhase('error');
+        return;
+      }
       setItems(resolved);
+      hasLoadedRef.current = true;
       setPhase('loaded');
     } catch (err) {
-      if (!mountedRef.current) return;
+      if (!mountedRef.current || seq !== requestSeq.current) return; // superseded
       console.warn('watchlist shelf: getWatchlist failed', err);
-      setPhase('error');
+      // Keep an already-loaded shelf visible on a background-refresh failure;
+      // only surface the error state when there's nothing on screen yet.
+      if (!hasLoadedRef.current) setPhase('error');
     }
   }, []);
 
