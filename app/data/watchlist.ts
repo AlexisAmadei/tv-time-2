@@ -77,6 +77,42 @@ export async function removeFromWatchlist(
   if (error) throw error;
 }
 
+// Per-title write queue. The DB unique index makes each individual add/remove
+// idempotent, but it does NOT order an add against a remove — two rapid toggles
+// on the same title would otherwise race, and the server's final state would be
+// decided by network-resolution order rather than the user's last tap. Chaining
+// the ops per key serializes them so they land in submit order (add→remove ends
+// removed, remove→add ends added), keeping the server in sync with the optimistic
+// UI. Keyed by `${mediaType}:${tmdbId}`; the chain is dropped once it drains.
+const writeChains = new Map<string, Promise<unknown>>();
+
+/**
+ * Persist a desired watchlist membership for one title, serialized per title so
+ * back-to-back toggles never race (see {@link writeChains}). `desired = true`
+ * adds, `false` removes. Rejects if the underlying write fails so the caller can
+ * roll its optimistic UI back.
+ */
+export function writeWatchlist(
+  tmdbId: number,
+  mediaType: 'movie' | 'tv',
+  desired: boolean,
+): Promise<void> {
+  const key = watchlistKey(tmdbId, mediaType);
+  const run = (writeChains.get(key) ?? Promise.resolve())
+    // Don't let a prior failure break the chain for the next queued op.
+    .catch(() => {})
+    .then(() =>
+      desired ? addToWatchlist(tmdbId, mediaType) : removeFromWatchlist(tmdbId, mediaType),
+    );
+  writeChains.set(key, run);
+  // Drop the chain once this is the last op to settle, so the map can't grow
+  // unbounded over a long session.
+  run.catch(() => {}).finally(() => {
+    if (writeChains.get(key) === run) writeChains.delete(key);
+  });
+  return run;
+}
+
 /**
  * Which of the given titles are already on the watchlist — checked against the
  * server `watchlist_items` table (owner-scoped by RLS). Returns

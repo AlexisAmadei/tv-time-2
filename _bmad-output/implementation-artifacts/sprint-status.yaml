@@ -42,6 +42,8 @@
 
 generated: 2026-07-02
 last_updated: 2026-07-06
+# code review of story 2.3 completed 2026-07-06: 3-layer adversarial review (all 4 ACs conformant); 6 patches applied for optimistic-toggle races (in-flight-lookup clobber, add/remove serialization, same-frame double-tap, mountedRef guard), 1 deferred (pre-existing 2.2 Poster state), 3 dismissed; tsc clean → done
+# story 2.3 reconciled 2026-07-06: implementation (already committed in 6437091) verified task-by-task against spec; tsc/expo export gates pass; smoke-check + on-device pass outstanding (no local stack/emulator in this env) → review
 # story 2.3 started 2026-07-06: status → in-progress
 # story 2.1 marked done 2026-07-05
 # story 2.2 started 2026-07-05: status → in-progress
@@ -68,7 +70,7 @@ development_status:
   epic-2: in-progress
   2-1-full-search-experience: done
   2-2-title-detail-for-films-and-shows: done
-  2-3-save-a-title-to-the-watchlist: in-progress
+  2-3-save-a-title-to-the-watchlist: done
   2-4-watchlist-shelf-on-home: backlog
   epic-2-retrospective: optional
 

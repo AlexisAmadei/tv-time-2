@@ -35,7 +35,7 @@ import {
   type SeasonDetail,
   type TitleDetail,
 } from '../../data/catalog';
-import { addToWatchlist, getWatchlistKeys, removeFromWatchlist } from '../../data/watchlist';
+import { getWatchlistKeys, watchlistKey, writeWatchlist } from '../../data/watchlist';
 import type { AddStackParamList } from '../../navigation/AddStack';
 
 const COPY_ERROR = "We couldn't load this right now.";
@@ -76,6 +76,12 @@ export default function TitleDetailScreen({ route, navigation }: Props) {
   // Guards against a state update after the screen is popped mid-fetch (the
   // invoke isn't cancelable and can run up to DETAIL_INVOKE_TIMEOUT_MS).
   const mountedRef = useRef(true);
+  // Synchronous mirror of `watchlisted` so a same-frame double-tap reads the
+  // true current value (state would be stale until the next render).
+  const watchlistedRef = useRef(false);
+  // Set once the user taps the heart — after that, the best-effort seed lookup
+  // must NOT overwrite their optimistic action with a (possibly stale) snapshot.
+  const watchlistInteractedRef = useRef(false);
   const confirmationTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(() => {
     mountedRef.current = true;
@@ -121,29 +127,41 @@ export default function TitleDetailScreen({ route, navigation }: Props) {
   useEffect(() => {
     getWatchlistKeys([{ tmdbId, mediaType }])
       .then((keys) => {
-        if (!mountedRef.current) return;
-        setWatchlisted(keys.has(`${mediaType}:${tmdbId}`));
+        // Skip if unmounted, or if the user has already toggled — their
+        // optimistic action wins over this best-effort seed (a slow lookup must
+        // never revert a heart the user just tapped).
+        if (!mountedRef.current || watchlistInteractedRef.current) return;
+        const next = keys.has(watchlistKey(tmdbId, mediaType));
+        watchlistedRef.current = next;
+        setWatchlisted(next);
       })
       .catch(() => {});
   }, [tmdbId, mediaType]);
 
   // Tap ❤️: optimistic flip + persist, roll back on failure (mirrors AddScreen).
+  // `desired` is read from the ref (synchronous truth) so a same-frame double-tap
+  // toggles correctly; `writeWatchlist` serializes add-vs-remove per title.
   const handleToggleWatchlist = useCallback(() => {
-    const wasWatchlisted = watchlisted;
-    setWatchlisted(!wasWatchlisted);
-    const op = wasWatchlisted
-      ? removeFromWatchlist(tmdbId, mediaType)
-      : addToWatchlist(tmdbId, mediaType);
-    op.then(() => {
-      if (!mountedRef.current) return;
-      showConfirmation(wasWatchlisted ? COPY_WATCHLIST_REMOVED : COPY_WATCHLISTED);
-    }).catch((err) => {
-      console.warn('watchlist toggle failed', err);
-      if (!mountedRef.current) return;
-      setWatchlisted(wasWatchlisted); // roll back
-      showConfirmation(COPY_WATCHLIST_FAILED);
-    });
-  }, [watchlisted, tmdbId, mediaType, showConfirmation]);
+    watchlistInteractedRef.current = true;
+    const desired = !watchlistedRef.current;
+    watchlistedRef.current = desired;
+    setWatchlisted(desired);
+    writeWatchlist(tmdbId, mediaType, desired)
+      .then(() => {
+        if (!mountedRef.current) return;
+        showConfirmation(desired ? COPY_WATCHLISTED : COPY_WATCHLIST_REMOVED);
+      })
+      .catch((err) => {
+        console.warn('watchlist toggle failed', err);
+        if (!mountedRef.current) return;
+        // Roll back only if not already superseded by a newer toggle.
+        if (watchlistedRef.current === desired) {
+          watchlistedRef.current = !desired;
+          setWatchlisted(!desired);
+        }
+        showConfirmation(COPY_WATCHLIST_FAILED);
+      });
+  }, [tmdbId, mediaType, showConfirmation]);
 
   return (
     <Screen>

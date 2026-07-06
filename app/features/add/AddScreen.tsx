@@ -39,7 +39,7 @@ import { useTheme } from '../../theme/ThemeProvider';
 import type { Theme } from '../../theme/tokens';
 import { CatalogError, searchCatalog, type CatalogResult } from '../../data/catalog';
 import { getLoggedKeys, logWatch, watchKey } from '../../data/watchLog';
-import { addToWatchlist, getWatchlistKeys, removeFromWatchlist } from '../../data/watchlist';
+import { getWatchlistKeys, writeWatchlist } from '../../data/watchlist';
 import type { AddStackParamList } from '../../navigation/AddStack';
 
 const DEBOUNCE_MS = 300;
@@ -79,6 +79,21 @@ export default function AddScreen() {
   // optimistically the instant a ❤️ tap toggles one.
   const [watchlistKeys, setWatchlistKeys] = useState<Set<string>>(new Set());
   const [reduceMotion, setReduceMotion] = useState(false);
+
+  // Synchronous mirror of `watchlistKeys` so a tap reads the true current
+  // membership even for a second tap that lands in the same render frame (state
+  // reads would be stale until the next render). All membership writes go
+  // through `applyWatchlist`, which keeps ref and state in lockstep.
+  const watchlistKeysRef = useRef<Set<string>>(new Set());
+  // Keys the user has explicitly toggled this session. A still-in-flight
+  // post-search lookup must NOT overwrite these — the user's optimistic action
+  // (and its serialized server write) is the source of truth for them.
+  const watchlistDirtyRef = useRef<Set<string>>(new Set());
+  const applyWatchlist = useCallback((updater: (prev: Set<string>) => Set<string>) => {
+    const next = updater(watchlistKeysRef.current);
+    watchlistKeysRef.current = next;
+    setWatchlistKeys(next);
+  }, []);
 
   // Monotonic request id: only the latest in-flight search may commit its result,
   // so a slow earlier response can't overwrite a newer one (debounce race).
@@ -171,42 +186,49 @@ export default function AddScreen() {
     [showToast],
   );
 
-  // Tap ❤️: optimistic toggle (Story 2.3). Flip the key immediately (add or
-  // remove based on current membership), then persist via watchlist.ts; on
-  // failure, roll the key back and show the failure copy. This mirrors
-  // handleLog's optimism — the honest tradeoff: a failed write flips the heart
-  // back rather than lying that it saved. Idempotency is DB-guaranteed (unique
-  // index), so a racing double-tap can't duplicate a row.
+  // Tap ❤️: optimistic toggle (Story 2.3). Flip the key immediately, then
+  // persist via a per-title serialized write; on failure, roll back and show the
+  // failure copy. This mirrors handleLog's optimism — the honest tradeoff: a
+  // failed write flips the heart back rather than lying that it saved.
+  //
+  // `desired` is derived from the *ref* (synchronous truth), so a same-frame
+  // double-tap toggles correctly instead of both reading the same stale render
+  // snapshot. `writeWatchlist` serializes add-vs-remove per title so rapid
+  // toggles land server-side in tap order. Marking the key dirty stops a
+  // still-in-flight post-search lookup from resurrecting it.
   const handleToggleWatchlist = useCallback(
     (item: CatalogResult) => {
       const key = watchKey(item.tmdbId, item.mediaType);
-      const wasWatchlisted = watchlistKeys.has(key);
-      // Optimistic flip.
-      setWatchlistKeys((prev) => {
+      const desired = !watchlistKeysRef.current.has(key);
+      watchlistDirtyRef.current.add(key);
+      applyWatchlist((prev) => {
         const next = new Set(prev);
-        if (wasWatchlisted) next.delete(key);
-        else next.add(key);
+        if (desired) next.add(key);
+        else next.delete(key);
         return next;
       });
 
-      const op = wasWatchlisted
-        ? removeFromWatchlist(item.tmdbId, item.mediaType)
-        : addToWatchlist(item.tmdbId, item.mediaType);
-      op.then(() => {
-        showToast(wasWatchlisted ? COPY_WATCHLIST_REMOVED : COPY_WATCHLISTED);
-      }).catch((err) => {
-        console.warn('watchlist toggle failed', err);
-        // Roll back to the pre-tap membership.
-        setWatchlistKeys((prev) => {
-          const next = new Set(prev);
-          if (wasWatchlisted) next.add(key);
-          else next.delete(key);
-          return next;
+      writeWatchlist(item.tmdbId, item.mediaType, desired)
+        .then(() => {
+          if (!mountedRef.current) return;
+          showToast(desired ? COPY_WATCHLISTED : COPY_WATCHLIST_REMOVED);
+        })
+        .catch((err) => {
+          console.warn('watchlist toggle failed', err);
+          if (!mountedRef.current) return;
+          // Roll back only if the current state still reflects THIS write's
+          // intent — a newer toggle may have already superseded it.
+          applyWatchlist((prev) => {
+            if (prev.has(key) !== desired) return prev;
+            const next = new Set(prev);
+            if (desired) next.delete(key);
+            else next.add(key);
+            return next;
+          });
+          showToast(COPY_WATCHLIST_FAILED);
         });
-        showToast(COPY_WATCHLIST_FAILED);
-      });
     },
-    [watchlistKeys, showToast],
+    [applyWatchlist, showToast],
   );
 
   // Tap the card body (not the log button) → open title detail (Story 2.2).
@@ -255,10 +277,24 @@ export default function AddScreen() {
         .catch(() => {}); // best-effort — a failed lookup just shows no ticks yet
       // Same non-blocking, superseded-guarded, best-effort pattern for the
       // watchlist hearts (Story 2.3) — never gate the results list on it (FR14).
+      // Reconcile (not blind-union) over exactly the searched items: set each to
+      // what the server reports, but SKIP any key the user has toggled — the
+      // `seq` guard only covers a superseded *search*, not a toggle that lands
+      // while this lookup is in flight, and a union would resurrect a key the
+      // user just removed (unlike add-only `loggedKeys`).
       getWatchlistKeys(found)
-        .then((keys) => {
+        .then((serverKeys) => {
           if (seq !== requestSeq.current) return; // superseded
-          setWatchlistKeys((prev) => new Set([...prev, ...keys]));
+          applyWatchlist((prev) => {
+            const next = new Set(prev);
+            for (const it of found) {
+              const k = watchKey(it.tmdbId, it.mediaType);
+              if (watchlistDirtyRef.current.has(k)) continue; // user-controlled
+              if (serverKeys.has(k)) next.add(k);
+              else next.delete(k);
+            }
+            return next;
+          });
         })
         .catch(() => {});
     } catch (err) {
