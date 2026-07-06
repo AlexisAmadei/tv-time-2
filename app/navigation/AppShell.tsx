@@ -13,7 +13,7 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { useTheme } from '../theme/ThemeProvider';
 import BottomTabBar from './BottomTabBar';
 import AddStack from './AddStack';
-import HomeScreen from '../features/home/HomeScreen';
+import HomeStack from './HomeStack';
 import DiaryScreen from '../features/diary/DiaryScreen';
 import FeedScreen from '../features/feed/FeedScreen';
 import ProfileScreen from '../features/profile/ProfileScreen';
@@ -57,7 +57,7 @@ export default function AppShell({ session }: { session: Session }) {
         tabBar={(props) => <BottomTabBar {...props} />}
         screenOptions={{ headerShown: false }}
       >
-        <Tab.Screen name="Home" component={HomeScreen} options={{ title: 'Home' }} />
+        <Tab.Screen name="Home" component={HomeStack} options={{ title: 'Home' }} />
         <Tab.Screen name="Diary" component={DiaryScreen} options={{ title: 'Diary' }} />
         {/* The (+) fast-add slot. Wraps a stack (2.2) so a tapped result can push
             the title-detail screen; AddScreen stays the initial route. */}

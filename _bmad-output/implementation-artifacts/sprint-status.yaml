@@ -42,6 +42,8 @@
 
 generated: 2026-07-02
 last_updated: 2026-07-06
+# story 2.4 implemented 2026-07-06: getWatchlist() (throws on failure) + HomeStack (mirrors AddStack) + HomeScreen rewrite (Watchlist shelf, useFocusEffect refetch); tsc/expo export clean; smoke-check + on-device outstanding (no local stack/emulator) → review
+# story 2.4 drafted 2026-07-06: reuses fetchTitleDetail for shelf enrichment (no new endpoint), adds HomeStack (mirrors AddStack) so Home can push TitleDetail, retires the 1.3 static empty-state in favor of the shelf's own empty copy; status → ready-for-dev
 # code review of story 2.3 completed 2026-07-06: 3-layer adversarial review (all 4 ACs conformant); 6 patches applied for optimistic-toggle races (in-flight-lookup clobber, add/remove serialization, same-frame double-tap, mountedRef guard), 1 deferred (pre-existing 2.2 Poster state), 3 dismissed; tsc clean → done
 # story 2.3 reconciled 2026-07-06: implementation (already committed in 6437091) verified task-by-task against spec; tsc/expo export gates pass; smoke-check + on-device pass outstanding (no local stack/emulator in this env) → review
 # story 2.3 started 2026-07-06: status → in-progress
@@ -71,7 +73,7 @@ development_status:
   2-1-full-search-experience: done
   2-2-title-detail-for-films-and-shows: done
   2-3-save-a-title-to-the-watchlist: done
-  2-4-watchlist-shelf-on-home: backlog
+  2-4-watchlist-shelf-on-home: review
   epic-2-retrospective: optional
 
   epic-3: backlog

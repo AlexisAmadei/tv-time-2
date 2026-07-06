@@ -28,6 +28,13 @@ export interface WatchlistInput {
   mediaType: 'movie' | 'tv';
 }
 
+/** One saved-for-later row (Story 2.4) — camelCase mirror of a `watchlist_items` read. */
+export interface WatchlistItem {
+  tmdbId: number;
+  mediaType: 'movie' | 'tv';
+  createdAt: string;
+}
+
 /**
  * `${mediaType}:${tmdbId}` — the SAME key shape used to track "already watched"
  * (re-exported from {@link watchKey}) so a caller can compose "logged" and
@@ -111,6 +118,41 @@ export function writeWatchlist(
     if (writeChains.get(key) === run) writeChains.delete(key);
   });
   return run;
+}
+
+/**
+ * The full watchlist, newest-saved-first (Story 2.4) — the Home shelf's primary
+ * data source. Unlike {@link getWatchlistKeys} (a best-effort hint — a missed
+ * lookup just leaves a heart unfilled, harmless), this is the shelf's actual
+ * content: a silent degrade-to-`[]` on failure would render the "empty
+ * watchlist" copy for a user who really has saved titles, which is a lie about
+ * their state. So this THROWS on failure instead of swallowing it — the caller
+ * (Home) is expected to show a retry state, not a false empty state.
+ */
+export async function getWatchlist(): Promise<WatchlistItem[]> {
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
+  if (!session) return [];
+
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), WATCHLIST_KEYS_TIMEOUT_MS);
+  try {
+    const { data, error } = await supabase
+      .from('watchlist_items')
+      .select('tmdb_id, media_type, created_at')
+      .eq('user_id', session.user.id)
+      .order('created_at', { ascending: false })
+      .abortSignal(controller.signal);
+    if (error) throw error;
+    return (data ?? []).map((row) => ({
+      tmdbId: row.tmdb_id,
+      mediaType: row.media_type,
+      createdAt: row.created_at,
+    }));
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 /**

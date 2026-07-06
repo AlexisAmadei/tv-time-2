@@ -13,10 +13,11 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 
 import AddScreen from '../features/add/AddScreen';
 import TitleDetailScreen from '../features/title-detail/TitleDetailScreen';
+import type { TitleDetailParams } from './titleDetailParams';
 
 export type AddStackParamList = {
   AddSearch: undefined;
-  TitleDetail: { tmdbId: number; mediaType: 'movie' | 'tv' };
+  TitleDetail: TitleDetailParams;
 };
 
 const Stack = createNativeStackNavigator<AddStackParamList>();

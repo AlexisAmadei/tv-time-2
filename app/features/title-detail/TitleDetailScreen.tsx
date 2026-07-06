@@ -23,7 +23,6 @@ import {
 } from 'react-native';
 
 import { Ionicons } from '@expo/vector-icons';
-import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
 import { Screen } from '../../components/Screen';
 import { Poster } from '../../components/TitleCard';
@@ -36,7 +35,7 @@ import {
   type TitleDetail,
 } from '../../data/catalog';
 import { getWatchlistKeys, watchlistKey, writeWatchlist } from '../../data/watchlist';
-import type { AddStackParamList } from '../../navigation/AddStack';
+import type { TitleDetailParams } from '../../navigation/titleDetailParams';
 
 const COPY_ERROR = "We couldn't load this right now.";
 const COPY_SOFT_FALLBACK = 'Showing saved info — we couldn’t refresh just now.';
@@ -53,7 +52,14 @@ const DETAIL_POSTER_H = 210;
 
 type Phase = 'loading' | 'loaded' | 'error';
 
-type Props = NativeStackScreenProps<AddStackParamList, 'TitleDetail'>;
+// Stack-agnostic on purpose (Story 2.4): this screen is pushed from two
+// independent native-stacks (AddStack, HomeStack) with identical params — only
+// `route.params` and `navigation.goBack()` are used here, so there is no need
+// to couple this screen's typing to either stack's full param list.
+type Props = {
+  route: { params: TitleDetailParams };
+  navigation: { goBack: () => void };
+};
 
 export default function TitleDetailScreen({ route, navigation }: Props) {
   const { tmdbId, mediaType } = route.params;
