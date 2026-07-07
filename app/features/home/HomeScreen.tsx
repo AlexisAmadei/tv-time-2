@@ -262,7 +262,7 @@ export default function HomeScreen({ navigation }: Props) {
         phase={trackedPhase}
         items={trackedItems}
         emptyCopy={COPY_UP_NEXT_EMPTY}
-        horizontal
+        horizontal={false}
         onRetry={loadTracked}
         onOpenDetail={handleOpenDetail}
         theme={theme}
