@@ -105,7 +105,7 @@ graph LR
 
 - **Binds:** `tracked_shows.next_episode_pointer`, organic watch commits (FR11), the rewatch/edit recompute path (FR16)
 - **Prevents:** two independently-correct-looking writers (a client that computes-and-PATCHes the pointer directly, and the rewatch/edit recompute path that also touches it) silently disagreeing — in particular, a watch mutation populating `watches` but leaving a stale pointer with no error surface.
-- **Rule:** `next_episode_pointer` advancement happens through exactly one path: a Postgres function (`recompute_next_episode_pointer(user_id, tmdb_id)`, derive-from-full-watch-set, not a monotonic increment) exposed as a PostgREST RPC. The client calls this RPC — it never issues a raw `PATCH` against `tracked_shows.next_episode_pointer`. The same function serves both organic advance (log) and recompute-after-delete (edit/remove, FR16), and is idempotent under retry. There is no second computation of "what's next."
+- **Rule:** `next_episode_pointer` advancement happens through exactly one path: a Postgres function (`recompute_next_episode_pointer(user_id, tmdb_id, media_type)`, derive-from-full-watch-set, not a monotonic increment) exposed as a PostgREST RPC. `media_type` is part of the signature because `tmdb_id` is only unique within a media type — a movie and a tv show can share one, and `tracked_shows`' identity key is `(user_id, tmdb_id, media_type)`. The client calls this RPC — it never issues a raw `PATCH` against `tracked_shows.next_episode_pointer`. The same function serves both organic advance (log) and recompute-after-delete (edit/remove, FR16), and is idempotent under retry. There is no second computation of "what's next."
 
 ### AD-11 — GDPR hosting jurisdiction is EU/EEA, not left implicit
 

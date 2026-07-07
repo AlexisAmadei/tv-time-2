@@ -40,8 +40,12 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 # - Retrospective appends its action items to action_items; sprint-status surfaces open ones
 
+# code review of story 3.1 completed 2026-07-08: 3-layer adversarial review (Blind Hunter, Edge Case Hunter, Acceptance Auditor); all 4 ACs conformant, no scope-wall violations; 1 decision-needed patched (RPC p_media_type disambiguation for tmdb_id collisions across movie/tv, also updated ARCHITECTURE-SPINE.md AD-10), 1 patch applied (deduped COPY_TRACK_FAILED/COPY_WATCHLIST_FAILED into COPY_SAVE_FAILED), 3 deferred (duplicate cross-shelf enrichment fetches, unbounded getTrackedShows() fan-out, narrow token-refresh race in pointer RPC call), 13 dismissed; tsc clean → done
+# story 3.1 implemented 2026-07-07: tracked_shows table (0006) + recompute_next_episode_pointer security-definer RPC (0007, first in codebase) + catalog-title/catalog.ts tmdbEpisodeId plumbing + trackedShows.ts + "I'm watching this" on TitleDetailScreen + Up Next shelf above Watchlist on HomeScreen with whole-page empty-state reconciliation; tsc/expo export/smoke-check pass; RPC algorithm verified directly against local stack (movie/tv branch, graceful degradation, chronological ordering, derive-from-full-watch-set, AC4 idempotency, security-definer guard, grant restrictions); manual on-device UI pass outstanding (no emulator) → review
+# story 3.1 started 2026-07-07: status → in-progress
+# story 3.1 drafted 2026-07-07: tracked_shows table + security-definer recompute_next_episode_pointer RPC (catalog_cache dependency, security hardening) + catalog-title tmdbEpisodeId plumbing + "I'm watching this" on title detail + Up Next shelf on Home (reuses 2.4's shelf pattern) + deferred whole-page empty-state reconciliation; corrects epics' stale RPC name (advance_ → recompute_) against ARCHITECTURE-SPINE.md AD-10; status → ready-for-dev
 generated: 2026-07-02
-last_updated: 2026-07-06
+last_updated: 2026-07-08
 # code review of story 2.4 completed 2026-07-06: 3-layer adversarial review (Blind Hunter, Edge Case Hunter, Acceptance Auditor); all 4 ACs conformant, no scope-wall violations; 3 patches applied to HomeScreen.load (all-enrichment-fail false-empty → error state, requestSeq guard vs stale focus-refetch, background-refresh instead of spinner flicker), 1 deferred (unbounded fan-out — spec punts to future optimization), 4 dismissed; tsc + android export clean → done
 # story 2.4 implemented 2026-07-06: getWatchlist() (throws on failure) + HomeStack (mirrors AddStack) + HomeScreen rewrite (Watchlist shelf, useFocusEffect refetch); tsc/expo export clean; smoke-check + on-device outstanding (no local stack/emulator) → review
 # story 2.4 drafted 2026-07-06: reuses fetchTitleDetail for shelf enrichment (no new endpoint), adds HomeStack (mirrors AddStack) so Home can push TitleDetail, retires the 1.3 static empty-state in favor of the shelf's own empty copy; status → ready-for-dev
@@ -77,8 +81,8 @@ development_status:
   2-4-watchlist-shelf-on-home: done
   epic-2-retrospective: optional
 
-  epic-3: backlog
-  3-1-track-a-show-or-film-into-up-next: backlog
+  epic-3: in-progress
+  3-1-track-a-show-or-film-into-up-next: done
   3-2-one-tap-watched-advances-the-pointer: backlog
   3-3-log-a-film-in-one-action: backlog
   3-4-bulk-log-a-whole-season: backlog

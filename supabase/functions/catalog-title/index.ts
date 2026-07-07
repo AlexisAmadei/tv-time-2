@@ -34,11 +34,15 @@ interface ErrorEnvelope {
   details: unknown;
 }
 
-// A single episode within a season (tv only).
+// A single episode within a season (tv only). `tmdbEpisodeId` is TMDB's own
+// numeric episode id (distinct from `episodeNumber`) — the stable per-episode
+// identity Story 3.1's pointer RPC and `watches.tmdb_episode_id` (0003) key
+// off of. Added in Story 3.1; episodeNumber/name/airDate are unchanged.
 interface EpisodeDetail {
   episodeNumber: number;
   name: string;
   airDate: string | null;
+  tmdbEpisodeId: number;
 }
 
 // A season with its episode list (tv only).
@@ -150,6 +154,7 @@ interface TmdbTv {
 }
 
 interface TmdbEpisode {
+  id: number;
   episode_number: number;
   name?: string;
   air_date?: string | null;
@@ -174,6 +179,7 @@ async function fetchSeason(tmdbId: number, seasonNumber: number): Promise<Season
       episodeNumber: e.episode_number,
       name: e.name ?? `Episode ${e.episode_number}`,
       airDate: e.air_date ?? null,
+      tmdbEpisodeId: e.id,
     }));
     return {
       seasonNumber,

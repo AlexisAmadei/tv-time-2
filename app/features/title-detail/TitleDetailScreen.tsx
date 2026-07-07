@@ -35,6 +35,7 @@ import {
   type TitleDetail,
 } from '../../data/catalog';
 import { getWatchlistKeys, watchlistKey, writeWatchlist } from '../../data/watchlist';
+import { getTrackedKeys, trackShow } from '../../data/trackedShows';
 import type { TitleDetailParams } from '../../navigation/titleDetailParams';
 
 const COPY_ERROR = "We couldn't load this right now.";
@@ -44,7 +45,13 @@ const COPY_SOFT_FALLBACK = 'Showing saved info — we couldn’t refresh just no
 // inline live-region note that auto-hides.
 const COPY_WATCHLISTED = "We'll tell you when it's time.";
 const COPY_WATCHLIST_REMOVED = 'Removed from watchlist.';
-const COPY_WATCHLIST_FAILED = "Couldn't save that — try again.";
+// Shared generic save-failure copy — reused by both the watchlist and
+// tracking actions below (identical wording, so one constant, not two).
+const COPY_SAVE_FAILED = "Couldn't save that — try again.";
+// Story 3.1's "I'm watching this" confirmation — one emoji max (NFR10), warm,
+// no guilt/streak language. Reuses the same inline live-region note as the
+// watchlist confirmation (no second confirmation mechanism, per Dev Notes).
+const COPY_TRACKED = 'Added to Up Next.';
 const CONFIRMATION_DISMISS_MS = 3000;
 
 const DETAIL_POSTER_W = 140;
@@ -78,6 +85,9 @@ export default function TitleDetailScreen({ route, navigation }: Props) {
   // a shared Toast extraction is flagged as a later-story candidate, not built here).
   const [watchlisted, setWatchlisted] = useState(false);
   const [confirmation, setConfirmation] = useState<string | null>(null);
+  // Tracked state (Story 3.1) — sibling to the watchlist block above, same
+  // shape, same confirmation machinery (no second mechanism).
+  const [tracked, setTracked] = useState(false);
 
   // Guards against a state update after the screen is popped mid-fetch (the
   // invoke isn't cancelable and can run up to DETAIL_INVOKE_TIMEOUT_MS).
@@ -88,6 +98,11 @@ export default function TitleDetailScreen({ route, navigation }: Props) {
   // Set once the user taps the heart — after that, the best-effort seed lookup
   // must NOT overwrite their optimistic action with a (possibly stale) snapshot.
   const watchlistInteractedRef = useRef(false);
+  // Synchronous mirror of `tracked`, same reasoning as watchlistedRef.
+  const trackedRef = useRef(false);
+  // Set once the user taps "I'm watching this" — same guard as
+  // watchlistInteractedRef, so a slow best-effort seed lookup can't clobber it.
+  const trackInteractedRef = useRef(false);
   const confirmationTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(() => {
     mountedRef.current = true;
@@ -144,6 +159,45 @@ export default function TitleDetailScreen({ route, navigation }: Props) {
       .catch(() => {});
   }, [tmdbId, mediaType]);
 
+  // Best-effort initial tracked state (Story 3.1) — sibling effect to the
+  // watchlist seed lookup above, same guard shape (skip if unmounted or if
+  // the user has already tapped "I'm watching this").
+  useEffect(() => {
+    getTrackedKeys([{ tmdbId, mediaType }])
+      .then((keys) => {
+        if (!mountedRef.current || trackInteractedRef.current) return;
+        const next = keys.has(watchlistKey(tmdbId, mediaType));
+        trackedRef.current = next;
+        setTracked(next);
+      })
+      .catch(() => {});
+  }, [tmdbId, mediaType]);
+
+  // Tap "I'm watching this": optimistic flip + persist, roll back on failure.
+  // No untrack path (AC4) — once tracked, this is a no-op on further taps,
+  // both as a UI guard here and a DB-level guarantee (0006's unique index).
+  const handleTrackShow = useCallback(() => {
+    if (trackedRef.current) return;
+    trackInteractedRef.current = true;
+    trackedRef.current = true;
+    setTracked(true);
+    trackShow(tmdbId, mediaType)
+      .then(() => {
+        if (!mountedRef.current) return;
+        showConfirmation(COPY_TRACKED);
+      })
+      .catch((err) => {
+        console.warn('track show failed', err);
+        if (!mountedRef.current) return;
+        // Roll back only if not already superseded by a newer action.
+        if (trackedRef.current) {
+          trackedRef.current = false;
+          setTracked(false);
+        }
+        showConfirmation(COPY_SAVE_FAILED);
+      });
+  }, [tmdbId, mediaType, showConfirmation]);
+
   // Tap ❤️: optimistic flip + persist, roll back on failure (mirrors AddScreen).
   // `desired` is read from the ref (synchronous truth) so a same-frame double-tap
   // toggles correctly; `writeWatchlist` serializes add-vs-remove per title.
@@ -165,7 +219,7 @@ export default function TitleDetailScreen({ route, navigation }: Props) {
           watchlistedRef.current = !desired;
           setWatchlisted(!desired);
         }
-        showConfirmation(COPY_WATCHLIST_FAILED);
+        showConfirmation(COPY_SAVE_FAILED);
       });
   }, [tmdbId, mediaType, showConfirmation]);
 
@@ -251,6 +305,32 @@ export default function TitleDetailScreen({ route, navigation }: Props) {
                 />
                 <Text style={styles.watchlistLabel}>
                   {watchlisted ? 'On your watchlist' : 'Add to watchlist'}
+                </Text>
+              </Pressable>
+              {/* "I'm watching this" (Story 3.1) — second action row below the
+                  ❤️ button. No untrack path (AC4): once tracked, a further tap
+                  is a no-op (handleTrackShow's own guard, plus 0006's DB-level
+                  guarantee). Reachable in the same states as the watchlist
+                  heart (loaded + soft-fallback, never hard-error). No episode-
+                  state badge here (scope wall) — this story only tracks. */}
+              <Pressable
+                onPress={handleTrackShow}
+                disabled={tracked}
+                style={({ pressed }) => [styles.watchlistButton, pressed && !tracked && styles.watchlistButtonPressed]}
+                hitSlop={8}
+                accessibilityRole="button"
+                accessibilityState={{ disabled: tracked }}
+                accessibilityLabel={
+                  tracked ? `${detail.title} is being tracked` : `Start tracking ${detail.title}`
+                }
+              >
+                <Ionicons
+                  name={tracked ? 'checkmark-circle' : 'add-circle-outline'}
+                  size={24}
+                  color={theme.colors.primary}
+                />
+                <Text style={styles.watchlistLabel}>
+                  {tracked ? 'Tracking' : "I'm watching this"}
                 </Text>
               </Pressable>
               {confirmation && (

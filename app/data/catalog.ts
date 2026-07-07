@@ -23,11 +23,17 @@ export interface CatalogResult {
   posterPath: string | null;
 }
 
-/** One episode of a season (tv only) — mirror of catalog-title's payload. */
+/**
+ * One episode of a season (tv only) — mirror of catalog-title's payload.
+ * `tmdbEpisodeId` (Story 3.1) is TMDB's own numeric episode id, the stable
+ * per-episode identity the pointer RPC and `watches.tmdb_episode_id` key off
+ * of — distinct from `episodeNumber`.
+ */
 export interface EpisodeDetail {
   episodeNumber: number;
   name: string;
   airDate: string | null;
+  tmdbEpisodeId: number;
 }
 
 /** A season with its episode list (tv only). */
