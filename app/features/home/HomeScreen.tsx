@@ -40,7 +40,22 @@ import type { Theme } from '../../theme/tokens';
 import { fetchTitleDetail, type CatalogResult } from '../../data/catalog';
 import { getWatchlist } from '../../data/watchlist';
 import { getTrackedShows } from '../../data/trackedShows';
+import { logWatch, watchKey } from '../../data/watchLog';
+import { triggerSync } from '../../data/watchSync';
 import type { HomeStackParamList } from '../../navigation/HomeStack';
+
+// One tap ✓ Watched (Story 3.2) — reuses AddScreen's exact confirmation
+// copy (COPY_LOGGED/COPY_LOG_FAILED) and TitleDetailScreen's COPY_SAVE_FAILED
+// wording; defined per-file per this codebase's established convention (3.1's
+// code review left cross-file copy duplication alone).
+const COPY_WATCHED = 'Logged — nice one.';
+const COPY_WATCHED_FAILED = "Couldn't save that — try again.";
+const CONFIRMATION_DISMISS_MS = 3000;
+
+/** Up Next item — CatalogResult plus the pointer that gates the Watched pill. */
+interface UpNextItem extends CatalogResult {
+  nextEpisodePointer: number | null;
+}
 
 // AC2's (2.4) verbatim warm empty-watchlist copy (EXPERIENCE.md#Empty Watchlist).
 const COPY_WATCHLIST_EMPTY = 'Save something for later — tap ❤️ on any title.';
@@ -67,9 +82,17 @@ export default function HomeScreen({ navigation }: Props) {
   const styles = makeStyles(theme);
 
   const [trackedPhase, setTrackedPhase] = useState<Phase>('loading');
-  const [trackedItems, setTrackedItems] = useState<CatalogResult[]>([]);
+  const [trackedItems, setTrackedItems] = useState<UpNextItem[]>([]);
   const [watchlistPhase, setWatchlistPhase] = useState<Phase>('loading');
   const [watchlistItems, setWatchlistItems] = useState<CatalogResult[]>([]);
+
+  // ✓ Watched (Story 3.2) local UI state — per-key pending set (cleared once
+  // loadTracked's next run completes, not persisted beyond this mount) and a
+  // transient inline confirmation, mirroring TitleDetailScreen's simpler
+  // pattern (Home has no existing toast/banner infra).
+  const [watchedPendingKeys, setWatchedPendingKeys] = useState<Set<string>>(new Set());
+  const [confirmation, setConfirmation] = useState<string | null>(null);
+  const confirmationTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Guards against setState after unmount from an in-flight fetch (mirrors
   // TitleDetailScreen.load's mountedRef pattern). Shared by both shelves.
@@ -78,7 +101,18 @@ export default function HomeScreen({ navigation }: Props) {
     mountedRef.current = true;
     return () => {
       mountedRef.current = false;
+      if (confirmationTimer.current) clearTimeout(confirmationTimer.current);
     };
+  }, []);
+
+  // Transient inline confirmation, auto-hides — mirrors
+  // TitleDetailScreen.showConfirmation exactly (no third mechanism invented).
+  const showConfirmation = useCallback((message: string) => {
+    setConfirmation(message);
+    if (confirmationTimer.current) clearTimeout(confirmationTimer.current);
+    confirmationTimer.current = setTimeout(() => {
+      if (mountedRef.current) setConfirmation(null);
+    }, CONFIRMATION_DISMISS_MS);
   }, []);
 
   // Independent monotonic request tokens + first-paint gates per shelf.
@@ -102,7 +136,7 @@ export default function HomeScreen({ navigation }: Props) {
         rows.map((row) => fetchTitleDetail(row.tmdbId, row.mediaType)),
       );
       if (!mountedRef.current || seq !== trackedRequestSeq.current) return; // superseded
-      const resolved: CatalogResult[] = [];
+      const resolved: UpNextItem[] = [];
       settled.forEach((result, i) => {
         if (result.status === 'fulfilled') {
           const { detail } = result.value;
@@ -112,6 +146,10 @@ export default function HomeScreen({ navigation }: Props) {
             title: detail.title,
             year: detail.year,
             posterPath: detail.posterPath,
+            // Carried through the same zip that already pairs each
+            // fetchTitleDetail result back to its source row by index — no
+            // separate fetch (Story 3.2, Task 4).
+            nextEpisodePointer: rows[i].nextEpisodePointer,
           });
         } else {
           // One title's metadata is unavailable — drop that card, don't block
@@ -130,6 +168,9 @@ export default function HomeScreen({ navigation }: Props) {
       setTrackedItems(resolved);
       trackedHasLoadedRef.current = true;
       setTrackedPhase('loaded');
+      // This load run has settled — clear any watchedPending markers so a
+      // stale-forever pending pill can't survive past the data that resolved it.
+      setWatchedPendingKeys(new Set());
     } catch (err) {
       if (!mountedRef.current || seq !== trackedRequestSeq.current) return; // superseded
       console.warn('up next shelf: getTrackedShows failed', err);
@@ -221,6 +262,7 @@ export default function HomeScreen({ navigation }: Props) {
         phase={trackedPhase}
         items={trackedItems}
         emptyCopy={COPY_UP_NEXT_EMPTY}
+        horizontal
         onRetry={loadTracked}
         onOpenDetail={handleOpenDetail}
         theme={theme}
@@ -231,6 +273,7 @@ export default function HomeScreen({ navigation }: Props) {
         phase={watchlistPhase}
         items={watchlistItems}
         emptyCopy={COPY_WATCHLIST_EMPTY}
+        horizontal={false}
         onRetry={loadWatchlist}
         onOpenDetail={handleOpenDetail}
         theme={theme}
@@ -247,6 +290,7 @@ function Shelf({
   phase,
   items,
   emptyCopy,
+  horizontal,
   onRetry,
   onOpenDetail,
   theme,
@@ -256,6 +300,7 @@ function Shelf({
   phase: Phase;
   items: CatalogResult[];
   emptyCopy: string;
+  horizontal: boolean;
   onRetry: () => void;
   onOpenDetail: (item: CatalogResult) => void;
   theme: Theme;
@@ -294,15 +339,16 @@ function Shelf({
       {phase === 'loaded' && items.length > 0 && (
         <FlatList
           data={items}
-          horizontal
-          showsHorizontalScrollIndicator={false}
+          horizontal={horizontal}
+          showsHorizontalScrollIndicator={horizontal}
+          showsVerticalScrollIndicator={!horizontal}
           keyExtractor={(item) => `${item.mediaType}:${item.tmdbId}`}
           renderItem={({ item }) => (
-            <View style={styles.shelfCard}>
+            <View style={horizontal ? styles.shelfCardHorizontal : styles.shelfCardVertical}>
               <TitleCard item={item} onPress={onOpenDetail} />
             </View>
           )}
-          contentContainerStyle={styles.shelfContent}
+          contentContainerStyle={horizontal ? styles.shelfContentHorizontal : styles.shelfContentVertical}
         />
       )}
     </View>
@@ -333,7 +379,9 @@ function makeStyles(theme: Theme) {
       justifyContent: 'center',
     },
     retryText: { ...type.label, color: colors.inkPrimary },
-    shelfContent: { paddingBottom: spacing.xl },
-    shelfCard: { width: SHELF_CARD_WIDTH, marginRight: spacing.md },
+    shelfContentHorizontal: { paddingBottom: spacing.xl },
+    shelfContentVertical: { paddingBottom: spacing.xl, gap: spacing.md },
+    shelfCardHorizontal: { width: SHELF_CARD_WIDTH, marginRight: spacing.md },
+    shelfCardVertical: { width: '100%' },
   });
 }
