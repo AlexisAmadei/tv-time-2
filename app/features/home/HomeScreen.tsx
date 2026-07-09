@@ -25,6 +25,7 @@ import {
   ActivityIndicator,
   FlatList,
   Pressable,
+  ScrollView,
   StyleSheet,
   Text,
   View,
@@ -326,52 +327,58 @@ export default function HomeScreen({ navigation }: Props) {
 
   return (
     <Screen>
-      {confirmation && (
-        <Text style={styles.confirmation} accessibilityLiveRegion="polite">
-          {confirmation}
-        </Text>
-      )}
-      <Shelf
-        heading="Up Next"
-        phase={trackedPhase}
-        items={trackedItems}
-        emptyCopy={COPY_UP_NEXT_EMPTY}
-        horizontal={false}
-        onRetry={loadTracked}
-        onOpenDetail={handleOpenDetail}
-        onMarkWatched={handleMarkWatched}
-        watchedPendingKeys={watchedPendingKeys}
-        theme={theme}
-        styles={styles}
-      />
-      <Shelf
-        heading="Watchlist"
-        phase={watchlistPhase}
-        items={watchlistItems}
-        emptyCopy={COPY_WATCHLIST_EMPTY}
-        horizontal={false}
-        onRetry={loadWatchlist}
-        onOpenDetail={handleOpenDetail}
-        theme={theme}
-        styles={styles}
-      />
-      {watchedWatchlistItems.length > 0 && (
+      <ScrollView
+        style={styles.pageScroll}
+        contentContainerStyle={styles.pageScrollContent}
+        showsVerticalScrollIndicator={false}
+      >
+        {confirmation && (
+          <Text style={styles.confirmation} accessibilityLiveRegion="polite">
+            {confirmation}
+          </Text>
+        )}
         <Shelf
-          heading="Watched"
-          phase={watchlistPhase}
-          items={watchedWatchlistItems}
-          collapsedCopy="Tap to see what's already watched."
-          accordion
-          defaultExpanded={false}
+          heading="Up Next"
+          phase={trackedPhase}
+          items={trackedItems}
+          emptyCopy={COPY_UP_NEXT_EMPTY}
           horizontal={false}
-          onRetry={loadWatchlist}
+          onRetry={loadTracked}
           onOpenDetail={handleOpenDetail}
           onMarkWatched={handleMarkWatched}
           watchedPendingKeys={watchedPendingKeys}
           theme={theme}
           styles={styles}
         />
-      )}
+        <Shelf
+          heading="Watchlist"
+          phase={watchlistPhase}
+          items={watchlistItems}
+          emptyCopy={COPY_WATCHLIST_EMPTY}
+          horizontal={false}
+          onRetry={loadWatchlist}
+          onOpenDetail={handleOpenDetail}
+          theme={theme}
+          styles={styles}
+        />
+        {watchedWatchlistItems.length > 0 && (
+          <Shelf
+            heading="Watched"
+            phase={watchlistPhase}
+            items={watchedWatchlistItems}
+            collapsedCopy="Tap to see what's already watched."
+            accordion
+            defaultExpanded={false}
+            horizontal={false}
+            onRetry={loadWatchlist}
+            onOpenDetail={handleOpenDetail}
+            onMarkWatched={handleMarkWatched}
+            watchedPendingKeys={watchedPendingKeys}
+            theme={theme}
+            styles={styles}
+          />
+        )}
+      </ScrollView>
     </Screen>
   );
 }
@@ -478,6 +485,7 @@ function Shelf({
         <FlatList
           data={items}
           horizontal={horizontal}
+          scrollEnabled={horizontal}
           showsHorizontalScrollIndicator={horizontal}
           showsVerticalScrollIndicator={!horizontal}
           keyExtractor={(item) => `${item.mediaType}:${item.tmdbId}`}
@@ -520,6 +528,8 @@ function makeStyles(theme: Theme) {
       color: colors.inkSecondary,
       marginBottom: spacing.sm,
     },
+    pageScroll: { flex: 1 },
+    pageScrollContent: { flexGrow: 1 },
     shelfSection: { marginBottom: spacing.lg },
     heading: {
       ...type.title,
