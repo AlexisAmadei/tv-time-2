@@ -7,15 +7,15 @@
     "development": {
       "developmentClient": true,
       "distribution": "internal",
-      "node": ">=20.5.1"
+      "node": "22.22.2"
     },
     "preview": {
       "distribution": "internal",
-      "node": ">=20.5.1"
+      "node": "22.22.2"
     },
     "production": {
       "autoIncrement": true,
-      "node": ">=20.5.1"
+      "node": "22.22.2"
     }
   },
   "submit": {
