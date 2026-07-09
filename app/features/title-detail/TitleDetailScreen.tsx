@@ -37,6 +37,7 @@ import {
 import { getWatchlistKeys, watchlistKey, writeWatchlist } from '../../data/watchlist';
 import { getTrackedKeys, trackShow } from '../../data/trackedShows';
 import type { TitleDetailParams } from '../../navigation/titleDetailParams';
+import BulkLogSheet from './BulkLogSheet';
 
 const COPY_ERROR = "We couldn't load this right now.";
 const COPY_SOFT_FALLBACK = 'Showing saved info — we couldn’t refresh just now.';
@@ -52,6 +53,8 @@ const COPY_SAVE_FAILED = "Couldn't save that — try again.";
 // no guilt/streak language. Reuses the same inline live-region note as the
 // watchlist confirmation (no second confirmation mechanism, per Dev Notes).
 const COPY_TRACKED = 'Added to Up Next.';
+// Story 3.4's AC4/UX-DR20/Flow 2 bulk-log confirmation, verbatim.
+const COPY_SEASON_LOGGED = "That's a whole season in one sitting. Respect.";
 const CONFIRMATION_DISMISS_MS = 3000;
 
 const DETAIL_POSTER_W = 140;
@@ -88,6 +91,9 @@ export default function TitleDetailScreen({ route, navigation }: Props) {
   // Tracked state (Story 3.1) — sibling to the watchlist block above, same
   // shape, same confirmation machinery (no second mechanism).
   const [tracked, setTracked] = useState(false);
+  // Which season (if any) has its bulk-log sheet open (Story 3.4). Rendered
+  // once at the screen level (not nested per-SeasonRow) — see JSX below.
+  const [bulkLogSeason, setBulkLogSeason] = useState<SeasonDetail | null>(null);
 
   // Guards against a state update after the screen is popped mid-fetch (the
   // invoke isn't cancelable and can run up to DETAIL_INVOKE_TIMEOUT_MS).
@@ -359,11 +365,31 @@ export default function TitleDetailScreen({ route, navigation }: Props) {
                 Seasons
               </Text>
               {detail.seasons.map((season) => (
-                <SeasonRow key={season.seasonNumber} season={season} styles={styles} theme={theme} />
+                <SeasonRow
+                  key={season.seasonNumber}
+                  season={season}
+                  styles={styles}
+                  theme={theme}
+                  onMarkSeasonWatched={setBulkLogSeason}
+                />
               ))}
             </View>
           )}
         </ScrollView>
+      )}
+
+      {detail && (
+        <BulkLogSheet
+          season={bulkLogSeason}
+          visible={bulkLogSeason != null}
+          tmdbId={tmdbId}
+          mediaType={mediaType}
+          onDismiss={() => setBulkLogSeason(null)}
+          onLogged={() => {
+            setBulkLogSeason(null);
+            showConfirmation(COPY_SEASON_LOGGED);
+          }}
+        />
       )}
     </Screen>
   );
@@ -374,10 +400,12 @@ function SeasonRow({
   season,
   styles,
   theme,
+  onMarkSeasonWatched,
 }: {
   season: SeasonDetail;
   styles: ReturnType<typeof makeStyles>;
   theme: Theme;
+  onMarkSeasonWatched: (season: SeasonDetail) => void;
 }) {
   const [expanded, setExpanded] = useState(false);
   const count = season.episodes.length;
@@ -414,6 +442,17 @@ function SeasonRow({
             </View>
           </View>
         ))}
+      {/* Separate control from the header Pressable above — expand/collapse is
+          unrelated, unchanged 2.2 behavior (Story 3.4, AC1). */}
+      <Pressable
+        onPress={() => onMarkSeasonWatched(season)}
+        style={styles.markSeasonButton}
+        accessibilityRole="button"
+        accessibilityLabel={`Mark all of ${season.name} watched`}
+      >
+        <Ionicons name="checkmark-done-outline" size={20} color={theme.colors.primary} />
+        <Text style={styles.markSeasonText}>Mark whole season watched</Text>
+      </Pressable>
     </View>
   );
 }
@@ -504,5 +543,17 @@ function makeStyles(theme: Theme) {
     episodeText: { flex: 1, gap: 2 },
     episodeName: { ...type.body, color: colors.inkPrimary },
     episodeMeta: { ...type.meta, color: colors.inkSecondary },
+    // "Mark whole season watched" (Story 3.4) — 44/48pt min tap target
+    // (Accessibility Floor), full-width row inside the season card.
+    markSeasonButton: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing.sm,
+      minHeight: 48,
+      paddingHorizontal: spacing.md,
+      borderTopWidth: StyleSheet.hairlineWidth,
+      borderTopColor: colors.borderHairline,
+    },
+    markSeasonText: { ...type.label, color: colors.primary },
   });
 }

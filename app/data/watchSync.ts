@@ -55,6 +55,19 @@ export async function triggerSync(): Promise<void> {
     // a foreground/reconnect trigger that may never come. Loop until a full
     // pass syncs nothing new (rows all failing / offline), which also bounds it
     // against spinning on persistently-failing rows.
+    // Show tmdb_ids needing a pointer recompute, collected across every pass
+    // of this drain and dedupe'd for the WHOLE triggerSync() call (Task
+    // 1c/Story 3.4) — several rows for the same show, whether they land in one
+    // pass or are spread across a few (e.g. some upserts failing and retrying
+    // in a later pass), only ever need one recompute call. Calling the RPC
+    // inline per-row (the pre-3.4 bug) would recompute against a `watches`
+    // table that only reflects the first of N upserts so far, landing the
+    // pointer on "next after episode 1" instead of "next after the whole
+    // batch"; scoping the dedupe to a single pass (3.4's original fix) still
+    // under-collapses a bulk commit that spans more than one pass. Firing once
+    // per show per drain — after every pass has finished, once the loop below
+    // exits — is the level this is actually correct at.
+    const recomputeTmdbIds = new Set<number>();
     while (true) {
       // Owner-filtered: only drain rows belonging to the current user, so a
       // pending watch created by a previously signed-in account is never
@@ -66,11 +79,6 @@ export async function triggerSync(): Promise<void> {
       if (rows.length === 0) break;
 
       let progressed = false;
-      // Dedupe recompute calls within this pass — several rows for the same
-      // show syncing together only need the pointer recomputed once (the RPC
-      // is idempotent under retry, AD-10, so this is an optimization, not a
-      // correctness requirement).
-      const recomputedThisPass = new Set<string>();
       for (const row of rows) {
         try {
           // upsert keyed on the client-generated id — a retry after an
@@ -93,7 +101,11 @@ export async function triggerSync(): Promise<void> {
                   tmdb_episode_id: row.tmdb_episode_id,
                   watched_at: row.watched_at,
                   rating: row.rating,
-                  mood: row.mood,
+                  // Local `pending_watches.mood` is a bare `text` (db.ts); the
+                  // server `watches.mood` is `text[]` (0003) — wrap into a
+                  // single-element array here, at the sync boundary, rather
+                  // than changing the local column's shape.
+                  mood: row.mood ? [row.mood] : null,
                   note: row.note,
                 },
                 { onConflict: 'id' },
@@ -115,52 +127,12 @@ export async function triggerSync(): Promise<void> {
           progressed = true;
 
           // Organic pointer advance (Story 3.2, AC1/AC2/AC4): a side effect of
-          // THIS row's own successful upsert, never a raw PATCH on
-          // tracked_shows. Deriving from the full synced `watches` set (AD-10)
-          // requires this row to already be visible server-side — which it now
-          // is, by construction. Wrapped in its own try/catch: a failed/timed-
-          // out recompute must not mark this row's sync as failed — the watch
-          // itself already synced.
+          // this row's own successful upsert, never a raw PATCH on
+          // tracked_shows. Just collect the tmdb_id here — the actual RPC call
+          // happens once per drain, after every pass has finished (see the
+          // comment on `recomputeTmdbIds` above).
           if (row.media_type === 'tv' && row.tmdb_episode_id != null) {
-            // media_type is always 'tv' inside this branch, so the show's
-            // tmdb_id alone is a sufficient dedupe key.
-            const dedupeKey = String(row.tmdb_id);
-            if (!recomputedThisPass.has(dedupeKey)) {
-              recomputedThisPass.add(dedupeKey);
-              try {
-                const recomputeController = new AbortController();
-                const recomputeTimer = setTimeout(
-                  () => recomputeController.abort(),
-                  RECOMPUTE_TIMEOUT_MS,
-                );
-                try {
-                  const { error: rpcError } = await supabase
-                    .rpc('recompute_next_episode_pointer', {
-                      p_user_id: userId,
-                      p_tmdb_id: row.tmdb_id,
-                      p_media_type: 'tv',
-                    })
-                    .abortSignal(recomputeController.signal);
-                  if (rpcError) {
-                    // Unlike the upsert above, there's no dedicated retry for this
-                    // call — the pointer just stays as-is until another episode of
-                    // this show is later logged and synced (which re-triggers this
-                    // same code path for that new row).
-                    console.warn(
-                      `watchSync: pointer recompute failed for ${row.tmdb_id}, pointer left as-is until the next watch for this show syncs`,
-                      rpcError,
-                    );
-                  }
-                } finally {
-                  clearTimeout(recomputeTimer);
-                }
-              } catch (err) {
-                console.warn(
-                  `watchSync: pointer recompute failed for ${row.tmdb_id}, pointer left as-is until the next watch for this show syncs`,
-                  err,
-                );
-              }
-            }
+            recomputeTmdbIds.add(row.tmdb_id);
           }
         } catch (err) {
           console.warn(`watchSync: row ${row.id} failed, will retry later`, err);
@@ -171,6 +143,51 @@ export async function triggerSync(): Promise<void> {
       // we're offline) — stop rather than spin. Rows added mid-pass are picked
       // up by the next iteration as long as this one made progress.
       if (!progressed) break;
+    }
+
+    // Once-per-drain-per-show pointer recompute (Task 1c/Story 3.4) — runs
+    // after every pass has had its chance to upsert, so each call derives the
+    // pointer from a `watches` table that reflects every row this whole
+    // triggerSync() call managed to sync, not just whichever pass happened to
+    // pick up a given show's rows first. Deriving from the full synced
+    // `watches` set (AD-10) requires the rows to already be visible
+    // server-side — which they now are, by construction. Each call is wrapped
+    // in its own try/catch: a failed/timed-out recompute must not undo the
+    // upserts above — the watches themselves already synced.
+    for (const tmdbId of recomputeTmdbIds) {
+      try {
+        const recomputeController = new AbortController();
+        const recomputeTimer = setTimeout(
+          () => recomputeController.abort(),
+          RECOMPUTE_TIMEOUT_MS,
+        );
+        try {
+          const { error: rpcError } = await supabase
+            .rpc('recompute_next_episode_pointer', {
+              p_user_id: userId,
+              p_tmdb_id: tmdbId,
+              p_media_type: 'tv',
+            })
+            .abortSignal(recomputeController.signal);
+          if (rpcError) {
+            // Unlike the upsert above, there's no dedicated retry for this
+            // call — the pointer just stays as-is until another episode of
+            // this show is later logged and synced (which re-triggers this
+            // same code path for that new row).
+            console.warn(
+              `watchSync: pointer recompute failed for ${tmdbId}, pointer left as-is until the next watch for this show syncs`,
+              rpcError,
+            );
+          }
+        } finally {
+          clearTimeout(recomputeTimer);
+        }
+      } catch (err) {
+        console.warn(
+          `watchSync: pointer recompute failed for ${tmdbId}, pointer left as-is until the next watch for this show syncs`,
+          err,
+        );
+      }
     }
   } finally {
     syncing = false;

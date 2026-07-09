@@ -1,5 +1,8 @@
+# story 3.4 implemented 2026-07-10: fixed two latent 1.5/3.2 outbox/sync gaps this story is first to exercise (LogWatchInput rating/mood passthrough; watchSync's per-row-inline pointer recompute moved to once-per-pass-per-show, after the row loop, so a bulk commit's pointer reflects the WHOLE batch not just episode 1) + mood array-wrap at the sync boundary (0003's server text[] vs local text mismatch) + 0008 migration locking watches.mood to the FR18 8-chip CHECK + "Mark whole season watched" on SeasonRow + new BulkLogSheet.tsx (RN Modal, pre-checked episode list, minimal 5-star rating, single-select mood chips) + TitleDetailScreen wiring with verbatim AC4 confirmation copy; tsc/expo export/smoke-check clean; migrations re-applied; Task 1c's fix verified directly against local Supabase stack with a scenario shaped to expose the pre-fix bug (deselect the LAST episode of a 5-ep bulk commit) — pointer correctly lands on episode 5 (would have frozen at episode 2 under old code); on-device manual UI pass outstanding (no emulator) → review
+# story 3.4 started 2026-07-10: status → in-progress
 # generated: 2026-07-02
-# last_updated: 2026-07-05
+# last_updated: 2026-07-10
+# story 3.4 drafted 2026-07-10: bulk-log sheet (new file, TitleDetailScreen's SeasonRow gains "Mark whole season watched") logs N episodes via existing logWatch()/watchSync outbox unchanged in shape; fixes two latent gaps this story is first to exercise — LogWatchInput lacked rating/mood passthrough (always null since 1.5), and watchSync's per-row-inline pointer-recompute call would fire on partial data when several episodes of the same show sync in one pass (correct for 3.2's one-episode-at-a-time case, wrong for this story's N-episode bulk commit) — moved to once-per-pass-per-show after the row loop; adds 0008 migration locking watches.mood to the FR18 8-chip CHECK per ARCHITECTURE-SPINE's Consistency Conventions; status → ready-for-dev
 # project: tv-time-2
 # project_key: NOKEY
 # tracking_system: file-system
@@ -47,7 +50,7 @@
 # story 3.1 drafted 2026-07-07: tracked_shows table + security-definer recompute_next_episode_pointer RPC (catalog_cache dependency, security hardening) + catalog-title tmdbEpisodeId plumbing + "I'm watching this" on title detail + Up Next shelf on Home (reuses 2.4's shelf pattern) + deferred whole-page empty-state reconciliation; corrects epics' stale RPC name (advance_ → recompute_) against ARCHITECTURE-SPINE.md AD-10; status → ready-for-dev
 # story 3.2 drafted 2026-07-08: reuses 3.1's existing recompute_next_episode_pointer RPC (0007, already patched with p_media_type) unchanged — organic pointer advance is wired as a side effect of watchSync's per-row sync success (avoids racing the still-in-flight outbox drain, and reuses existing retry triggers for the offline case, AC2); adds a rounded-sm primary-fill uppercase Watched pill to TitleCard, gated to tv items with a non-null pointer on the Up Next shelf only (no film control — Story 3.3 — and no title-detail control, per NFR1's "tap on the Up Next card" framing); status → ready-for-dev
 generated: 2026-07-02
-last_updated: 2026-07-09
+last_updated: 2026-07-10
 # story 3.3 drafted 2026-07-08: closes the exact gap 3.2's own scope wall named as 3.3's job — a tracked film sitting in Up Next has no Watched action (its pointer is permanently null, so 3.2's tv-only pointer-gated pill never renders for it). Widens HomeScreen's Watched-pill gate to unconditionally cover movie items and fixes handleMarkWatched's hardcoded mediaType:'tv'/tmdbEpisodeId — no other file touched (logWatch, watchSync's RPC gate, and TitleCard's pill are already fully media-type-generic). Explicitly declines a title-detail Watched control (not named by any AC, matches 3.2's own precedent of punting that table row). status → ready-for-dev
 # story 3.3 started 2026-07-08: status → in-progress
 # story 3.3 implemented 2026-07-08: handleMarkWatched now forwards item's real mediaType + film-null tmdbEpisodeId; Up Next shelf's Watched pill gate widened to cover tracked films unconditionally alongside tv's existing pointer gate; single file touched (HomeScreen.tsx); tsc/expo export/smoke-check clean; film watches-row shape + rewatch/AD-3 independence verified directly against local Supabase stack; watchSync.ts's tv-only recompute gate confirmed unchanged by source inspection; on-device manual pass (pill rendering, soft confirmation) outstanding (no emulator) → review
@@ -92,7 +95,7 @@ development_status:
   3-1-track-a-show-or-film-into-up-next: done
   3-2-one-tap-watched-advances-the-pointer: done
   3-3-log-a-film-in-one-action: done
-  3-4-bulk-log-a-whole-season: backlog
+  3-4-bulk-log-a-whole-season: review
   3-5-rate-and-react-after-a-watch: backlog
   3-6-attach-an-optional-note-to-a-watch: backlog
   3-7-edit-or-remove-a-logged-watch: backlog

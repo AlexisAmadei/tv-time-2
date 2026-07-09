@@ -7,8 +7,10 @@
 // offline) has no bearing on whether logWatch resolved.
 
 import { randomUUID } from 'expo-crypto';
+import type { SQLiteDatabase } from 'expo-sqlite';
 
 import { getDb } from './db';
+import { isValidMood } from './moods';
 import { supabase } from './supabaseClient';
 import { triggerSync } from './watchSync';
 
@@ -20,11 +22,47 @@ export interface LogWatchInput {
   tmdbId: number;
   mediaType: 'movie' | 'tv';
   tmdbEpisodeId?: number | null;
+  /** 0–10 half-star scale (`watches.rating`'s existing CHECK). Story 3.4/3.5. */
+  rating?: number | null;
+  /** One locked FR18 emoji. Story 3.4/3.5. */
+  mood?: string | null;
 }
 
 /** `${mediaType}:${tmdbId}` — the key shape used to track "already watched". */
 export function watchKey(tmdbId: number, mediaType: string): string {
   return `${mediaType}:${tmdbId}`;
+}
+
+// Shared by logWatch and logWatchBatch — the actual `pending_watches` insert,
+// with the mood boundary-check (FR18's locked set, moods.ts) applied right
+// before the row is written so a bad value never enters the local outbox in
+// the first place (vs. discovering it only when the server's CHECK
+// constraint, 0008, rejects the eventual sync upsert).
+async function insertPendingWatch(
+  db: SQLiteDatabase,
+  userId: string,
+  input: LogWatchInput,
+  now: string,
+): Promise<void> {
+  if (!isValidMood(input.mood)) {
+    throw new Error(`logWatch: invalid mood value "${input.mood}"`);
+  }
+  await db.runAsync(
+    `insert into pending_watches
+      (id, user_id, tmdb_id, media_type, tmdb_episode_id, watched_at, rating, mood, note, synced_at, created_at)
+     values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    randomUUID(),
+    userId,
+    input.tmdbId,
+    input.mediaType,
+    input.tmdbEpisodeId ?? null,
+    now,
+    input.rating ?? null,
+    input.mood ?? null,
+    null,
+    null,
+    now,
+  );
 }
 
 /**
@@ -43,30 +81,40 @@ export async function logWatch(input: LogWatchInput): Promise<void> {
   } = await supabase.auth.getSession();
   if (!session) throw new Error('logWatch: no active session');
 
-  const id = randomUUID();
-  const now = new Date().toISOString();
-
   // Synchronous (awaited) local write BEFORE any network call — this ordering
   // is the whole point of AC1. Never fire the sync attempt first.
-  await db.runAsync(
-    `insert into pending_watches
-      (id, user_id, tmdb_id, media_type, tmdb_episode_id, watched_at, rating, mood, note, synced_at, created_at)
-     values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    id,
-    session.user.id,
-    input.tmdbId,
-    input.mediaType,
-    input.tmdbEpisodeId ?? null,
-    now,
-    null,
-    null,
-    null,
-    null,
-    now,
-  );
+  await insertPendingWatch(db, session.user.id, input, new Date().toISOString());
 
   // Fire-and-forget: never await, never let a slow/failed sync delay or fail
   // the confirmation the caller shows the moment this promise resolves.
+  void triggerSync().catch(() => {});
+}
+
+/**
+ * Commit several watches as one atomic local-outbox transaction (Story 3.4's
+ * bulk-log case — e.g. every episode of a season). One session lookup and one
+ * `withTransactionAsync` for the whole batch instead of N of each: either all
+ * rows land or none do, so a failure partway through (the same
+ * "no active session" case `logWatch` throws on) leaves nothing to
+ * half-retry — a retry after a failed batch simply resubmits the same input
+ * with no risk of double-logging whatever "succeeded" before the rollback.
+ * One `triggerSync()` fires after the whole batch commits, not once per row.
+ */
+export async function logWatchBatch(inputs: LogWatchInput[]): Promise<void> {
+  if (inputs.length === 0) return;
+  const db = await getDb();
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
+  if (!session) throw new Error('logWatchBatch: no active session');
+
+  const now = new Date().toISOString();
+  await db.withTransactionAsync(async () => {
+    for (const input of inputs) {
+      await insertPendingWatch(db, session.user.id, input, now);
+    }
+  });
+
   void triggerSync().catch(() => {});
 }
 
