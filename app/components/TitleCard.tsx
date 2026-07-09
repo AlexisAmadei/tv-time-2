@@ -105,6 +105,8 @@ export function TitleCard({
   logged = false,
   onToggleWatchlist,
   watchlisted = false,
+  onMarkWatched,
+  watchedPending = false,
 }: {
   item: CatalogResult;
   onPress?: (item: CatalogResult) => void;
@@ -112,6 +114,8 @@ export function TitleCard({
   logged?: boolean;
   onToggleWatchlist?: (item: CatalogResult) => void;
   watchlisted?: boolean;
+  onMarkWatched?: (item: CatalogResult) => void;
+  watchedPending?: boolean;
 }) {
   const theme = useTheme();
   const styles = makeStyles(theme);
@@ -181,6 +185,27 @@ export function TitleCard({
           />
         </Pressable>
       )}
+      {/* ✓ Watched pill (Story 3.2, DESIGN.md `watched-badge`: "rounded-sm,
+          primary fill, uppercase label") — a visually distinct control from
+          the checkmark-icon onLog button above (Search's Story-1.5 log
+          affordance; the two coexist on different surfaces). Only rendered
+          when a handler is provided — the Up Next shelf gates this per-item
+          to tracked tv shows with a non-null pointer (HomeScreen), never for
+          films or the Watchlist shelf. */}
+      {onMarkWatched && (
+        <Pressable
+          onPress={() => onMarkWatched(item)}
+          disabled={watchedPending}
+          style={({ pressed }) => [styles.watchedPill, pressed && styles.watchedPillPressed]}
+          hitSlop={8}
+          accessibilityRole="button"
+          accessibilityLabel={
+            watchedPending ? `${item.title} marked watched` : `Mark ${item.title} watched`
+          }
+        >
+          <Text style={styles.watchedPillText}>Watched</Text>
+        </Pressable>
+      )}
     </Pressable>
   );
 }
@@ -214,6 +239,20 @@ function makeStyles(theme: Theme) {
       alignSelf: 'center',
     },
     iconButtonPressed: { backgroundColor: colors.surfaceSunken },
+    // The `watched-badge` component (DESIGN.md) — mirrors the retryButton/
+    // retryText pair's colors (primary fill, inkPrimary text), rounded-sm,
+    // uppercase label.
+    watchedPill: {
+      backgroundColor: colors.primary,
+      borderRadius: radius.sm,
+      paddingHorizontal: spacing.md,
+      minHeight: 44,
+      alignSelf: 'center',
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    watchedPillPressed: { opacity: 0.7 },
+    watchedPillText: { ...type.label, color: colors.inkPrimary, textTransform: 'uppercase' },
     cardText: { flex: 1, justifyContent: 'center', gap: spacing.xs },
     cardTitle: { ...type.cardTitle, color: colors.inkPrimary },
     cardMeta: { ...type.meta, color: colors.inkSecondary },

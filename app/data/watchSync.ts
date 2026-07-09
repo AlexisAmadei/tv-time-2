@@ -29,6 +29,8 @@ let syncing = false;
 // platform default — a hung upsert must not pin the `syncing` guard forever and
 // deadlock all future sync triggers.
 const UPSERT_TIMEOUT_MS = 10_000;
+// Mirrors UPSERT_TIMEOUT_MS's pattern for the pointer-recompute RPC (Story 3.2).
+const RECOMPUTE_TIMEOUT_MS = 10_000;
 
 /**
  * Drain all unsynced `pending_watches` rows into `watches`. Idempotent-safe to
@@ -64,6 +66,11 @@ export async function triggerSync(): Promise<void> {
       if (rows.length === 0) break;
 
       let progressed = false;
+      // Dedupe recompute calls within this pass — several rows for the same
+      // show syncing together only need the pointer recomputed once (the RPC
+      // is idempotent under retry, AD-10, so this is an optimization, not a
+      // correctness requirement).
+      const recomputedThisPass = new Set<string>();
       for (const row of rows) {
         try {
           // upsert keyed on the client-generated id — a retry after an
@@ -106,6 +113,49 @@ export async function triggerSync(): Promise<void> {
             row.id,
           ]);
           progressed = true;
+
+          // Organic pointer advance (Story 3.2, AC1/AC2/AC4): a side effect of
+          // THIS row's own successful upsert, never a raw PATCH on
+          // tracked_shows. Deriving from the full synced `watches` set (AD-10)
+          // requires this row to already be visible server-side — which it now
+          // is, by construction. Wrapped in its own try/catch: a failed/timed-
+          // out recompute must not mark this row's sync as failed — the watch
+          // itself already synced.
+          if (row.media_type === 'tv' && row.tmdb_episode_id != null) {
+            const dedupeKey = `${row.tmdb_id}:${row.media_type}`;
+            if (!recomputedThisPass.has(dedupeKey)) {
+              recomputedThisPass.add(dedupeKey);
+              try {
+                const recomputeController = new AbortController();
+                const recomputeTimer = setTimeout(
+                  () => recomputeController.abort(),
+                  RECOMPUTE_TIMEOUT_MS,
+                );
+                try {
+                  const { error: rpcError } = await supabase
+                    .rpc('recompute_next_episode_pointer', {
+                      p_user_id: userId,
+                      p_tmdb_id: row.tmdb_id,
+                      p_media_type: 'tv',
+                    })
+                    .abortSignal(recomputeController.signal);
+                  if (rpcError) {
+                    console.warn(
+                      `watchSync: pointer recompute failed for ${row.tmdb_id}, will retry later`,
+                      rpcError,
+                    );
+                  }
+                } finally {
+                  clearTimeout(recomputeTimer);
+                }
+              } catch (err) {
+                console.warn(
+                  `watchSync: pointer recompute failed for ${row.tmdb_id}, will retry later`,
+                  err,
+                );
+              }
+            }
+          }
         } catch (err) {
           console.warn(`watchSync: row ${row.id} failed, will retry later`, err);
         }

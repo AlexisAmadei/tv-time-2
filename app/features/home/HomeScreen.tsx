@@ -30,6 +30,7 @@ import {
   View,
 } from 'react-native';
 
+import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
@@ -40,7 +41,7 @@ import type { Theme } from '../../theme/tokens';
 import { fetchTitleDetail, type CatalogResult } from '../../data/catalog';
 import { getWatchlist } from '../../data/watchlist';
 import { getTrackedShows } from '../../data/trackedShows';
-import { logWatch, watchKey } from '../../data/watchLog';
+import { getLoggedKeys, logWatch, watchKey } from '../../data/watchLog';
 import { triggerSync } from '../../data/watchSync';
 import type { HomeStackParamList } from '../../navigation/HomeStack';
 
@@ -85,6 +86,7 @@ export default function HomeScreen({ navigation }: Props) {
   const [trackedItems, setTrackedItems] = useState<UpNextItem[]>([]);
   const [watchlistPhase, setWatchlistPhase] = useState<Phase>('loading');
   const [watchlistItems, setWatchlistItems] = useState<CatalogResult[]>([]);
+  const [watchedWatchlistItems, setWatchedWatchlistItems] = useState<CatalogResult[]>([]);
 
   // ✓ Watched (Story 3.2) local UI state — per-key pending set (cleared once
   // loadTracked's next run completes, not persisted beyond this mount) and a
@@ -206,7 +208,19 @@ export default function HomeScreen({ navigation }: Props) {
         if (!watchlistHasLoadedRef.current) setWatchlistPhase('error');
         return;
       }
-      setWatchlistItems(resolved);
+      const loggedKeys = await getLoggedKeys(resolved);
+      const unwatched: CatalogResult[] = [];
+      const watched: CatalogResult[] = [];
+      resolved.forEach((item) => {
+        const key = watchKey(item.tmdbId, item.mediaType);
+        if (loggedKeys.has(key)) {
+          watched.push(item);
+        } else {
+          unwatched.push(item);
+        }
+      });
+      setWatchlistItems(unwatched);
+      setWatchedWatchlistItems(watched);
       watchlistHasLoadedRef.current = true;
       setWatchlistPhase('loaded');
     } catch (err) {
@@ -237,6 +251,38 @@ export default function HomeScreen({ navigation }: Props) {
     [navigation],
   );
 
+  // ✓ Watched (Story 3.2, Task 4): the local outbox write (logWatch) IS the
+  // commit (AC1/AC2), regardless of connectivity — the confirmation shows the
+  // instant it resolves. triggerSync() afterward both attempts the pointer
+  // recompute right away for the common online case (Task 2, watchSync.ts)
+  // and is a safe no-op/failure when offline; loadTracked() then redraws
+  // whatever pointer is current — harmless if unchanged, self-heals on the
+  // next successful sync plus a later focus/foreground trigger.
+  const handleMarkWatched = useCallback(
+    async (item: CatalogResult) => {
+      const upNextItem = item as UpNextItem;
+      const key = watchKey(item.tmdbId, item.mediaType);
+      try {
+        await logWatch({
+          tmdbId: item.tmdbId,
+          mediaType: item.mediaType,
+          tmdbEpisodeId: item.mediaType === 'tv' ? upNextItem.nextEpisodePointer : null,
+        });
+        if (!mountedRef.current) return;
+        showConfirmation(COPY_WATCHED);
+        setWatchedPendingKeys((prev) => new Set(prev).add(key));
+        await triggerSync().catch(() => {});
+        if (!mountedRef.current) return;
+        loadTracked();
+      } catch (err) {
+        console.warn('mark watched failed', err);
+        if (!mountedRef.current) return;
+        showConfirmation(COPY_WATCHED_FAILED);
+      }
+    },
+    [showConfirmation, loadTracked],
+  );
+
   // Whole-page empty reconciliation (Story 3.1, see file header): collapse to
   // the single whole-page copy only once BOTH shelves are loaded AND empty.
   // Either shelf still loading/erroring means "not yet decided" — keep
@@ -245,7 +291,8 @@ export default function HomeScreen({ navigation }: Props) {
     trackedPhase === 'loaded' &&
     watchlistPhase === 'loaded' &&
     trackedItems.length === 0 &&
-    watchlistItems.length === 0;
+    watchlistItems.length === 0 &&
+    watchedWatchlistItems.length === 0;
 
   if (wholePageEmpty) {
     return (
@@ -257,6 +304,11 @@ export default function HomeScreen({ navigation }: Props) {
 
   return (
     <Screen>
+      {confirmation && (
+        <Text style={styles.confirmation} accessibilityLiveRegion="polite">
+          {confirmation}
+        </Text>
+      )}
       <Shelf
         heading="Up Next"
         phase={trackedPhase}
@@ -265,6 +317,8 @@ export default function HomeScreen({ navigation }: Props) {
         horizontal={false}
         onRetry={loadTracked}
         onOpenDetail={handleOpenDetail}
+        onMarkWatched={handleMarkWatched}
+        watchedPendingKeys={watchedPendingKeys}
         theme={theme}
         styles={styles}
       />
@@ -279,6 +333,22 @@ export default function HomeScreen({ navigation }: Props) {
         theme={theme}
         styles={styles}
       />
+      {watchedWatchlistItems.length > 0 && (
+        <Shelf
+          heading="Watched"
+          phase={watchlistPhase}
+          items={watchedWatchlistItems}
+          emptyCopy="Nothing watched from your watchlist yet."
+          collapsedCopy="Pre-compacted view. Tap to expand."
+          accordion
+          defaultExpanded={false}
+          horizontal={false}
+          onRetry={loadWatchlist}
+          onOpenDetail={handleOpenDetail}
+          theme={theme}
+          styles={styles}
+        />
+      )}
     </Screen>
   );
 }
@@ -290,9 +360,14 @@ function Shelf({
   phase,
   items,
   emptyCopy,
+  collapsedCopy,
   horizontal,
+  accordion = false,
+  defaultExpanded = true,
   onRetry,
   onOpenDetail,
+  onMarkWatched,
+  watchedPendingKeys,
   theme,
   styles,
 }: {
@@ -300,17 +375,50 @@ function Shelf({
   phase: Phase;
   items: CatalogResult[];
   emptyCopy: string;
+  collapsedCopy?: string;
   horizontal: boolean;
+  accordion?: boolean;
+  defaultExpanded?: boolean;
   onRetry: () => void;
   onOpenDetail: (item: CatalogResult) => void;
+  // Only the Up Next shelf instance passes these — the Watchlist shelf omits
+  // them entirely, so its cards never render a Watched pill (Story 3.2 scope
+  // wall).
+  onMarkWatched?: (item: CatalogResult) => void;
+  watchedPendingKeys?: Set<string>;
   theme: Theme;
   styles: ReturnType<typeof makeStyles>;
 }) {
+  const [expanded, setExpanded] = useState(defaultExpanded);
+  const canCollapse = accordion && items.length > 0;
+  const showList = !canCollapse || expanded;
   return (
     <View style={styles.shelfSection}>
-      <Text style={styles.heading} accessibilityRole="header">
-        {heading}
-      </Text>
+      {accordion ? (
+        <Pressable
+          onPress={() => setExpanded((v) => !v)}
+          style={styles.accordionHeader}
+          accessibilityRole="button"
+          accessibilityState={{ expanded }}
+          accessibilityLabel={`${heading}, ${items.length} title${items.length === 1 ? '' : 's'}`}
+        >
+          <View style={styles.accordionHeaderText}>
+            <Text style={styles.heading}>{heading}</Text>
+            <Text style={styles.accordionMeta}>
+              {items.length} title{items.length === 1 ? '' : 's'}
+            </Text>
+          </View>
+          <Ionicons
+            name={expanded ? 'chevron-up' : 'chevron-down'}
+            size={20}
+            color={theme.colors.inkSecondary}
+          />
+        </Pressable>
+      ) : (
+        <Text style={styles.heading} accessibilityRole="header">
+          {heading}
+        </Text>
+      )}
 
       {phase === 'loading' && (
         <View style={styles.centerState}>
@@ -336,18 +444,39 @@ function Shelf({
         <Text style={styles.stateText}>{emptyCopy}</Text>
       )}
 
-      {phase === 'loaded' && items.length > 0 && (
+      {phase === 'loaded' && canCollapse && !expanded && (
+        <Text style={styles.collapsedStateText}>{collapsedCopy ?? 'Tap to expand.'}</Text>
+      )}
+
+      {phase === 'loaded' && showList && items.length > 0 && (
         <FlatList
           data={items}
           horizontal={horizontal}
           showsHorizontalScrollIndicator={horizontal}
           showsVerticalScrollIndicator={!horizontal}
           keyExtractor={(item) => `${item.mediaType}:${item.tmdbId}`}
-          renderItem={({ item }) => (
-            <View style={horizontal ? styles.shelfCardHorizontal : styles.shelfCardVertical}>
-              <TitleCard item={item} onPress={onOpenDetail} />
-            </View>
-          )}
+          renderItem={({ item }) => {
+            // AC1/AC2 gate (Story 3.3): the Watched pill renders for every
+            // tracked film unconditionally (no pointer concept applies) and
+            // for a tracked tv item only once its pointer is non-null —
+            // caught-up/not-yet-computed tv shows still render with no pill.
+            const upNextItem = item as Partial<UpNextItem>;
+            const showWatchedPill =
+              !!onMarkWatched &&
+              (item.mediaType === 'movie' ||
+                (item.mediaType === 'tv' && upNextItem.nextEpisodePointer != null));
+            const key = watchKey(item.tmdbId, item.mediaType);
+            return (
+              <View style={horizontal ? styles.shelfCardHorizontal : styles.shelfCardVertical}>
+                <TitleCard
+                  item={item}
+                  onPress={onOpenDetail}
+                  onMarkWatched={showWatchedPill ? onMarkWatched : undefined}
+                  watchedPending={watchedPendingKeys?.has(key) ?? false}
+                />
+              </View>
+            );
+          }}
           contentContainerStyle={horizontal ? styles.shelfContentHorizontal : styles.shelfContentVertical}
         />
       )}
@@ -358,17 +487,38 @@ function Shelf({
 function makeStyles(theme: Theme) {
   const { colors, type, spacing } = theme;
   return StyleSheet.create({
+    // Transient ✓ Watched confirmation (Story 3.2) — mirrors
+    // TitleDetailScreen's watchlistConfirmation styling.
+    confirmation: {
+      ...type.meta,
+      color: colors.inkSecondary,
+      marginBottom: spacing.sm,
+    },
     shelfSection: { marginBottom: spacing.lg },
     heading: {
       ...type.title,
       color: colors.inkPrimary,
-      marginBottom: spacing.md,
     },
+    accordionHeader: {
+      marginBottom: spacing.md,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      gap: spacing.md,
+    },
+    accordionHeaderText: { flex: 1, gap: spacing.xs },
+    accordionMeta: { ...type.meta, color: colors.inkSecondary },
     centerState: { paddingTop: spacing.xl, alignItems: 'center' },
     stateText: {
       ...type.body,
       color: colors.inkSecondary,
       paddingTop: spacing.sm,
+    },
+    collapsedStateText: {
+      ...type.body,
+      color: colors.inkSecondary,
+      paddingTop: spacing.xs,
+      paddingBottom: spacing.sm,
     },
     errorState: { paddingTop: spacing.lg, gap: spacing.md, alignItems: 'flex-start' },
     retryButton: {

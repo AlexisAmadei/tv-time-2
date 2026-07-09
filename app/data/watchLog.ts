@@ -19,6 +19,7 @@ const LOGGED_KEYS_TIMEOUT_MS = 10_000;
 export interface LogWatchInput {
   tmdbId: number;
   mediaType: 'movie' | 'tv';
+  tmdbEpisodeId?: number | null;
 }
 
 /** `${mediaType}:${tmdbId}` — the key shape used to track "already watched". */
@@ -55,7 +56,7 @@ export async function logWatch(input: LogWatchInput): Promise<void> {
     session.user.id,
     input.tmdbId,
     input.mediaType,
-    null,
+    input.tmdbEpisodeId ?? null,
     now,
     null,
     null,
