@@ -189,21 +189,28 @@ export function TitleCard({
           primary fill, uppercase label") — a visually distinct control from
           the checkmark-icon onLog button above (Search's Story-1.5 log
           affordance; the two coexist on different surfaces). Only rendered
-          when a handler is provided — the Up Next shelf gates this per-item
-          to tracked tv shows with a non-null pointer (HomeScreen), never for
-          films or the Watchlist shelf. */}
+          when a handler is provided — HomeScreen decides which shelves/items
+          get one: tracked films unconditionally, tracked tv shows once their
+          pointer is non-null (Story 3.3 widened this from tv-only), and (as
+          of this story's review) the Watchlist's own "Watched" shelf too, so
+          a rewatch can be logged from there (AD-3). */}
       {onMarkWatched && (
         <Pressable
           onPress={() => onMarkWatched(item)}
           disabled={watchedPending}
-          style={({ pressed }) => [styles.watchedPill, pressed && styles.watchedPillPressed]}
+          style={({ pressed }) => [
+            styles.watchedPill,
+            watchedPending && styles.watchedPillDisabled,
+            pressed && styles.watchedPillPressed,
+          ]}
           hitSlop={8}
           accessibilityRole="button"
+          accessibilityState={{ disabled: watchedPending }}
           accessibilityLabel={
             watchedPending ? `${item.title} marked watched` : `Mark ${item.title} watched`
           }
         >
-          <Text style={styles.watchedPillText}>Watched</Text>
+          <Text style={styles.watchedPillText}>{watchedPending ? 'Saved' : 'Watched'}</Text>
         </Pressable>
       )}
     </Pressable>
@@ -252,6 +259,7 @@ function makeStyles(theme: Theme) {
       justifyContent: 'center',
     },
     watchedPillPressed: { opacity: 0.7 },
+    watchedPillDisabled: { opacity: 0.5 },
     watchedPillText: { ...type.label, color: colors.inkPrimary, textTransform: 'uppercase' },
     cardText: { flex: 1, justifyContent: 'center', gap: spacing.xs },
     cardTitle: { ...type.cardTitle, color: colors.inkPrimary },

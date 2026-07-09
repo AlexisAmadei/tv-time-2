@@ -29,8 +29,8 @@ let syncing = false;
 // platform default — a hung upsert must not pin the `syncing` guard forever and
 // deadlock all future sync triggers.
 const UPSERT_TIMEOUT_MS = 10_000;
-// Mirrors UPSERT_TIMEOUT_MS's pattern for the pointer-recompute RPC (Story 3.2).
-const RECOMPUTE_TIMEOUT_MS = 10_000;
+// Same bound as the upsert (Story 3.2) — reuse the constant so the two can't drift apart.
+const RECOMPUTE_TIMEOUT_MS = UPSERT_TIMEOUT_MS;
 
 /**
  * Drain all unsynced `pending_watches` rows into `watches`. Idempotent-safe to
@@ -122,7 +122,9 @@ export async function triggerSync(): Promise<void> {
           // out recompute must not mark this row's sync as failed — the watch
           // itself already synced.
           if (row.media_type === 'tv' && row.tmdb_episode_id != null) {
-            const dedupeKey = `${row.tmdb_id}:${row.media_type}`;
+            // media_type is always 'tv' inside this branch, so the show's
+            // tmdb_id alone is a sufficient dedupe key.
+            const dedupeKey = String(row.tmdb_id);
             if (!recomputedThisPass.has(dedupeKey)) {
               recomputedThisPass.add(dedupeKey);
               try {
@@ -140,8 +142,12 @@ export async function triggerSync(): Promise<void> {
                     })
                     .abortSignal(recomputeController.signal);
                   if (rpcError) {
+                    // Unlike the upsert above, there's no dedicated retry for this
+                    // call — the pointer just stays as-is until another episode of
+                    // this show is later logged and synced (which re-triggers this
+                    // same code path for that new row).
                     console.warn(
-                      `watchSync: pointer recompute failed for ${row.tmdb_id}, will retry later`,
+                      `watchSync: pointer recompute failed for ${row.tmdb_id}, pointer left as-is until the next watch for this show syncs`,
                       rpcError,
                     );
                   }
@@ -150,7 +156,7 @@ export async function triggerSync(): Promise<void> {
                 }
               } catch (err) {
                 console.warn(
-                  `watchSync: pointer recompute failed for ${row.tmdb_id}, will retry later`,
+                  `watchSync: pointer recompute failed for ${row.tmdb_id}, pointer left as-is until the next watch for this show syncs`,
                   err,
                 );
               }

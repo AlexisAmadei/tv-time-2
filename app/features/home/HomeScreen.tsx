@@ -88,11 +88,16 @@ export default function HomeScreen({ navigation }: Props) {
   const [watchlistItems, setWatchlistItems] = useState<CatalogResult[]>([]);
   const [watchedWatchlistItems, setWatchedWatchlistItems] = useState<CatalogResult[]>([]);
 
-  // ✓ Watched (Story 3.2) local UI state — per-key pending set (cleared once
-  // loadTracked's next run completes, not persisted beyond this mount) and a
-  // transient inline confirmation, mirroring TitleDetailScreen's simpler
-  // pattern (Home has no existing toast/banner infra).
+  // ✓ Watched (Story 3.2) local UI state — per-key pending set, owned entirely
+  // by handleMarkWatched's own call (added at the start of its flow, cleared
+  // in its own `finally`, regardless of any concurrent/unrelated loadTracked()
+  // run) — not persisted beyond this mount. `watchedPendingKeysRef` mirrors
+  // the state synchronously so a rapid double-tap on the same pill (before
+  // React re-renders with the disabled prop) is still caught. A transient
+  // inline confirmation mirrors TitleDetailScreen's simpler pattern (Home has
+  // no existing toast/banner infra).
   const [watchedPendingKeys, setWatchedPendingKeys] = useState<Set<string>>(new Set());
+  const watchedPendingKeysRef = useRef<Set<string>>(new Set());
   const [confirmation, setConfirmation] = useState<string | null>(null);
   const confirmationTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -170,9 +175,6 @@ export default function HomeScreen({ navigation }: Props) {
       setTrackedItems(resolved);
       trackedHasLoadedRef.current = true;
       setTrackedPhase('loaded');
-      // This load run has settled — clear any watchedPending markers so a
-      // stale-forever pending pill can't survive past the data that resolved it.
-      setWatchedPendingKeys(new Set());
     } catch (err) {
       if (!mountedRef.current || seq !== trackedRequestSeq.current) return; // superseded
       console.warn('up next shelf: getTrackedShows failed', err);
@@ -257,30 +259,50 @@ export default function HomeScreen({ navigation }: Props) {
   // recompute right away for the common online case (Task 2, watchSync.ts)
   // and is a safe no-op/failure when offline; loadTracked() then redraws
   // whatever pointer is current — harmless if unchanged, self-heals on the
-  // next successful sync plus a later focus/foreground trigger.
+  // next successful sync plus a later focus/foreground trigger. Also calls
+  // loadWatchlist() so a title that's both tracked and on the Watchlist moves
+  // into the Watched shelf immediately, not just on the next unrelated focus.
+  //
+  // `key`'s pending marker is added at the start of this call and cleared in
+  // its own `finally` — never by a different, possibly-concurrent
+  // loadTracked()/loadWatchlist() run — so marking one item watched can never
+  // prematurely re-enable (or permanently stick) another item's pill.
   const handleMarkWatched = useCallback(
     async (item: CatalogResult) => {
-      const upNextItem = item as UpNextItem;
+      const upNextItem = item as Partial<UpNextItem>;
       const key = watchKey(item.tmdbId, item.mediaType);
+      if (watchedPendingKeysRef.current.has(key)) return; // already in flight — ignore the duplicate tap
+      watchedPendingKeysRef.current.add(key);
+      setWatchedPendingKeys((prev) => new Set(prev).add(key));
       try {
         await logWatch({
           tmdbId: item.tmdbId,
           mediaType: item.mediaType,
-          tmdbEpisodeId: item.mediaType === 'tv' ? upNextItem.nextEpisodePointer : null,
+          tmdbEpisodeId: item.mediaType === 'tv' ? (upNextItem.nextEpisodePointer ?? null) : null,
         });
         if (!mountedRef.current) return;
         showConfirmation(COPY_WATCHED);
-        setWatchedPendingKeys((prev) => new Set(prev).add(key));
-        await triggerSync().catch(() => {});
+        await triggerSync().catch((err) => {
+          console.warn('mark watched: background sync failed', err);
+        });
         if (!mountedRef.current) return;
         loadTracked();
+        loadWatchlist();
       } catch (err) {
         console.warn('mark watched failed', err);
-        if (!mountedRef.current) return;
-        showConfirmation(COPY_WATCHED_FAILED);
+        if (mountedRef.current) showConfirmation(COPY_WATCHED_FAILED);
+      } finally {
+        watchedPendingKeysRef.current.delete(key);
+        if (mountedRef.current) {
+          setWatchedPendingKeys((prev) => {
+            const next = new Set(prev);
+            next.delete(key);
+            return next;
+          });
+        }
       }
     },
-    [showConfirmation, loadTracked],
+    [showConfirmation, loadTracked, loadWatchlist],
   );
 
   // Whole-page empty reconciliation (Story 3.1, see file header): collapse to
@@ -338,13 +360,14 @@ export default function HomeScreen({ navigation }: Props) {
           heading="Watched"
           phase={watchlistPhase}
           items={watchedWatchlistItems}
-          emptyCopy="Nothing watched from your watchlist yet."
-          collapsedCopy="Pre-compacted view. Tap to expand."
+          collapsedCopy="Tap to see what's already watched."
           accordion
           defaultExpanded={false}
           horizontal={false}
           onRetry={loadWatchlist}
           onOpenDetail={handleOpenDetail}
+          onMarkWatched={handleMarkWatched}
+          watchedPendingKeys={watchedPendingKeys}
           theme={theme}
           styles={styles}
         />
@@ -374,16 +397,19 @@ function Shelf({
   heading: string;
   phase: Phase;
   items: CatalogResult[];
-  emptyCopy: string;
+  // Optional: the "Watched" shelf only ever mounts once it already has items
+  // (see its call site), so it has no reachable empty state and passes none.
+  emptyCopy?: string;
   collapsedCopy?: string;
   horizontal: boolean;
   accordion?: boolean;
   defaultExpanded?: boolean;
   onRetry: () => void;
   onOpenDetail: (item: CatalogResult) => void;
-  // Only the Up Next shelf instance passes these — the Watchlist shelf omits
-  // them entirely, so its cards never render a Watched pill (Story 3.2 scope
-  // wall).
+  // Up Next and the Watched shelf pass these (tracked items and rewatchable
+  // watchlist items respectively); the plain Watchlist shelf omits them
+  // entirely, so its own cards never render a Watched pill (Story 3.2 scope
+  // wall — that shelf's items haven't been watched yet).
   onMarkWatched?: (item: CatalogResult) => void;
   watchedPendingKeys?: Set<string>;
   theme: Theme;
@@ -440,7 +466,7 @@ function Shelf({
         </View>
       )}
 
-      {phase === 'loaded' && items.length === 0 && (
+      {phase === 'loaded' && items.length === 0 && emptyCopy && (
         <Text style={styles.stateText}>{emptyCopy}</Text>
       )}
 
