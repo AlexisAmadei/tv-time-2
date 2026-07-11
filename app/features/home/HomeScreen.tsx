@@ -42,7 +42,7 @@ import { Screen } from '../../components/Screen';
 import { TitleCard } from '../../components/TitleCard';
 import { useTheme } from '../../theme/ThemeProvider';
 import type { Theme } from '../../theme/tokens';
-import { fetchTitleDetail, type CatalogResult } from '../../data/catalog';
+import { fetchTitleDetail, type CatalogResult, type TitleDetail } from '../../data/catalog';
 import { getWatchlist } from '../../data/watchlist';
 import { getTrackedShows } from '../../data/trackedShows';
 import { getLoggedKeys, logWatch, watchKey } from '../../data/watchLog';
@@ -60,6 +60,31 @@ const CONFIRMATION_DISMISS_MS = 3000;
 /** Up Next item — CatalogResult plus the pointer that gates the Watched pill. */
 interface UpNextItem extends CatalogResult {
   nextEpisodePointer: number | null;
+  // "S{season}E{episode} · {episode name}" for the show's next unwatched
+  // episode (tv only) — resolved from the same fetchTitleDetail() response
+  // already fetched to enrich this card, by matching nextEpisodePointer
+  // against each season's episode list. Null for films (no pointer concept)
+  // and for a tv show whose pointer is null (brand-new/caught-up) or whose
+  // matching episode isn't present in the fetched seasons.
+  nextEpisodeLabel: string | null;
+}
+
+/** Find the season/episode-number label for a TMDB episode id inside a
+ *  title's season list — the same "S{n}E{n}" shorthand EXPERIENCE.md's Flow 1
+ *  uses ("S3E5 is pre-selected"). Returns null if the pointer isn't found
+ *  (e.g. a stale pointer past a season list the enrichment fetch omitted). */
+function findNextEpisodeLabel(
+  seasons: TitleDetail['seasons'],
+  tmdbEpisodeId: number | null,
+): string | null {
+  if (tmdbEpisodeId == null || !seasons) return null;
+  for (const season of seasons) {
+    const episode = season.episodes.find((e) => e.tmdbEpisodeId === tmdbEpisodeId);
+    if (episode) {
+      return `S${season.seasonNumber}E${episode.episodeNumber} · ${episode.name}`;
+    }
+  }
+  return null;
 }
 
 // AC2's (2.4) verbatim warm empty-watchlist copy (EXPERIENCE.md#Empty Watchlist).
@@ -216,6 +241,11 @@ export default function HomeScreen({ navigation }: Props) {
             // fetchTitleDetail result back to its source row by index — no
             // separate fetch (Story 3.2, Task 4).
             nextEpisodePointer: rows[i].nextEpisodePointer,
+            // Resolved from this same detail response's `seasons` — no
+            // separate fetch either; films and pointer-less/unmatched tv
+            // shows fall back to null (Shelf then falls back to the plain
+            // title card with no subtitle).
+            nextEpisodeLabel: findNextEpisodeLabel(detail.seasons, rows[i].nextEpisodePointer),
           });
         } else {
           // One title's metadata is unavailable — drop that card, don't block
@@ -302,8 +332,8 @@ export default function HomeScreen({ navigation }: Props) {
 
   // Load both shelves on mount AND every time Home regains focus (e.g. after
   // tracking/❤️-ing a title from Add or title detail). Two independent calls,
-  // not Promise.all — a slow/failed Up Next fetch must not block or blank an
-  // already-working Watchlist shelf, and vice versa.
+  // not Promise.all — a slow/failed shelf must not block or blank an
+  // already-working one.
   useFocusEffect(
     useCallback(() => {
       loadTracked();
@@ -463,19 +493,22 @@ export default function HomeScreen({ navigation }: Props) {
             contentContainerStyle={styles.pageScrollContent}
             showsVerticalScrollIndicator={false}
           >
-            <Shelf
-              heading="Up Next"
-              phase={trackedPhase}
-              items={trackedByTab[tab.key]}
-              emptyCopy={COPY_UP_NEXT_EMPTY}
-              horizontal={false}
-              onRetry={loadTracked}
-              onOpenDetail={handleOpenDetail}
-              onMarkWatched={handleMarkWatched}
-              watchedPendingKeys={watchedPendingKeys}
-              theme={theme}
-              styles={styles}
-            />
+            {tab.key !== 'movie' && (
+              <Shelf
+                heading="Up Next"
+                phase={trackedPhase}
+                items={trackedByTab[tab.key]}
+                emptyCopy={COPY_UP_NEXT_EMPTY}
+                horizontal={false}
+                onRetry={loadTracked}
+                onOpenDetail={handleOpenDetail}
+                onMarkWatched={handleMarkWatched}
+                watchedPendingKeys={watchedPendingKeys}
+                watchedIcon
+                theme={theme}
+                styles={styles}
+              />
+            )}
             <Shelf
               heading="Watchlist"
               phase={watchlistPhase}
@@ -501,6 +534,7 @@ export default function HomeScreen({ navigation }: Props) {
                 onMarkWatched={handleMarkWatched}
                 watchedPendingKeys={watchedPendingKeys}
                 watchedIcon
+                watchedAlready
                 theme={theme}
                 styles={styles}
               />
@@ -533,6 +567,7 @@ function Shelf({
   onMarkWatched,
   watchedPendingKeys,
   watchedIcon = false,
+  watchedAlready = false,
   theme,
   styles,
 }: {
@@ -554,9 +589,14 @@ function Shelf({
   // wall — that shelf's items haven't been watched yet).
   onMarkWatched?: (item: CatalogResult) => void;
   watchedPendingKeys?: Set<string>;
-  // Watched shelf only: swap the "Watched" text pill for a round green tick
-  // (the item is already known-watched, so the label is redundant).
+  // Up Next and the Watched shelf both use the round green tick button (swaps
+  // out the plain text pill); Up Next's tap always marks a first watch,
+  // the Watched shelf's a rewatch — `watchedAlready` (below) tells TitleCard
+  // which accessibility label applies.
   watchedIcon?: boolean;
+  // See `watchedIcon` — Watched-shelf-only, tells the icon button's tap is a
+  // rewatch, not a first watch (AD-3).
+  watchedAlready?: boolean;
   theme: Theme;
   styles: ReturnType<typeof makeStyles>;
 }) {
@@ -646,6 +686,8 @@ function Shelf({
                   onMarkWatched={showWatchedPill ? onMarkWatched : undefined}
                   watchedPending={watchedPendingKeys?.has(key) ?? false}
                   watchedIcon={watchedIcon}
+                  watchedAlready={watchedAlready}
+                  subtitle={upNextItem.nextEpisodeLabel}
                 />
               </View>
             );

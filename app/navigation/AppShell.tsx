@@ -14,13 +14,13 @@ import { useTheme } from '../theme/ThemeProvider';
 import BottomTabBar from './BottomTabBar';
 import AddStack from './AddStack';
 import HomeStack from './HomeStack';
-import DiaryScreen from '../features/diary/DiaryScreen';
+import RecommendationsStack from './RecommendationsStack';
 import FeedScreen from '../features/feed/FeedScreen';
 import ProfileScreen from '../features/profile/ProfileScreen';
 
 export type RootTabParamList = {
   Home: undefined;
-  Diary: undefined;
+  Recommendations: undefined;
   Add: undefined;
   Feed: undefined;
   Profile: undefined;
@@ -58,7 +58,11 @@ export default function AppShell({ session }: { session: Session }) {
         screenOptions={{ headerShown: false }}
       >
         <Tab.Screen name="Home" component={HomeStack} options={{ title: 'Home' }} />
-        <Tab.Screen name="Diary" component={DiaryScreen} options={{ title: 'Diary' }} />
+        <Tab.Screen
+          name="Recommendations"
+          component={RecommendationsStack}
+          options={{ title: 'Recommendations' }}
+        />
         {/* The (+) fast-add slot. Wraps a stack (2.2) so a tapped result can push
             the title-detail screen; AddScreen stays the initial route. */}
         <Tab.Screen name="Add" component={AddStack} options={{ title: 'Add' }} />

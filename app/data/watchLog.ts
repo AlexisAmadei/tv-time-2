@@ -55,7 +55,7 @@ export interface WatchReaction {
 // when the server's CHECK constraint (0008) rejects the eventual sync upsert.
 // `note` has no server-side CHECK (see MAX_NOTE_LENGTH's comment) — this is
 // defense-in-depth behind RatingPrompt's own maxLength, not the only guard.
-function assertValidReaction(
+export function assertValidReaction(
   where: string,
   rating: number | null | undefined,
   moods: string[] | null | undefined,

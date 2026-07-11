@@ -12,7 +12,7 @@
 //                a "showing saved info" note; (b) nothing cached → the verbatim
 //                "We couldn't load this right now." + retry.
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Pressable,
@@ -26,6 +26,7 @@ import { Ionicons } from '@expo/vector-icons';
 
 import { Screen } from '../../components/Screen';
 import { Poster } from '../../components/TitleCard';
+import StarRating from '../../components/StarRating';
 import { useTheme } from '../../theme/ThemeProvider';
 import type { Theme } from '../../theme/tokens';
 import {
@@ -36,8 +37,10 @@ import {
 } from '../../data/catalog';
 import { getWatchlistKeys, watchlistKey, writeWatchlist } from '../../data/watchlist';
 import { getTrackedKeys, trackShow } from '../../data/trackedShows';
+import { getWatchesForTitle, type LoggedWatch } from '../../data/watchEdit';
 import type { TitleDetailParams } from '../../navigation/titleDetailParams';
 import BulkLogSheet from './BulkLogSheet';
+import EditWatchSheet from './EditWatchSheet';
 
 const COPY_ERROR = "We couldn't load this right now.";
 const COPY_SOFT_FALLBACK = 'Showing saved info — we couldn’t refresh just now.';
@@ -46,15 +49,24 @@ const COPY_SOFT_FALLBACK = 'Showing saved info — we couldn’t refresh just no
 // inline live-region note that auto-hides.
 const COPY_WATCHLISTED = "We'll tell you when it's time.";
 const COPY_WATCHLIST_REMOVED = 'Removed from watchlist.';
-// Shared generic save-failure copy — reused by both the watchlist and
-// tracking actions below (identical wording, so one constant, not two).
-const COPY_SAVE_FAILED = "Couldn't save that — try again.";
+// Shared generic save-failure copy — reused by the watchlist/tracking actions
+// below and, exported, by EditWatchSheet's own Save/Remove failure states
+// (Story 3.7) — one constant, not a second string with the same meaning.
+export const COPY_SAVE_FAILED = "Couldn't save that — try again.";
 // Story 3.1's "I'm watching this" confirmation — one emoji max (NFR10), warm,
 // no guilt/streak language. Reuses the same inline live-region note as the
 // watchlist confirmation (no second confirmation mechanism, per Dev Notes).
 const COPY_TRACKED = 'Added to Up Next.';
 // Story 3.4's AC4/UX-DR20/Flow 2 bulk-log confirmation, verbatim.
 const COPY_SEASON_LOGGED = "That's a whole season in one sitting. Respect.";
+// Story 3.7's "Your watches" section — edit/remove confirmations reuse the
+// same showConfirmation mechanism as everything else on this screen (Dev
+// Notes: do not build a third notification mechanism).
+const COPY_WATCH_UPDATED = 'Watch updated.';
+const COPY_WATCH_REMOVED = 'Watch removed.';
+// Inline error for the "Your watches" section only (not the whole-screen
+// error state — the rest of the screen already rendered fine).
+const COPY_WATCHES_FAILED = "Couldn't load your watches.";
 const CONFIRMATION_DISMISS_MS = 3000;
 
 const DETAIL_POSTER_W = 140;
@@ -94,6 +106,12 @@ export default function TitleDetailScreen({ route, navigation }: Props) {
   // Which season (if any) has its bulk-log sheet open (Story 3.4). Rendered
   // once at the screen level (not nested per-SeasonRow) — see JSX below.
   const [bulkLogSeason, setBulkLogSeason] = useState<SeasonDetail | null>(null);
+  // "Your watches" section (Story 3.7) — every watch logged for this title,
+  // and which one (if any) has its edit sheet open. Rendered once at the
+  // screen level, same pattern as bulkLogSeason above.
+  const [watches, setWatches] = useState<LoggedWatch[]>([]);
+  const [watchesError, setWatchesError] = useState<string | null>(null);
+  const [editingWatch, setEditingWatch] = useState<LoggedWatch | null>(null);
 
   // Guards against a state update after the screen is popped mid-fetch (the
   // invoke isn't cancelable and can run up to DETAIL_INVOKE_TIMEOUT_MS).
@@ -110,6 +128,11 @@ export default function TitleDetailScreen({ route, navigation }: Props) {
   // watchlistInteractedRef, so a slow best-effort seed lookup can't clobber it.
   const trackInteractedRef = useRef(false);
   const confirmationTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Guards loadWatches against a stale response clobbering a newer one (e.g.
+  // tmdbId/mediaType changing quickly, or an edit-triggered refetch racing a
+  // focus-triggered one) — same requestSeq pattern used elsewhere in this
+  // codebase (HomeScreen's shelves, etc.), mountedRef alone only covers unmount.
+  const watchesSeqRef = useRef(0);
   useEffect(() => {
     mountedRef.current = true;
     return () => {
@@ -146,6 +169,56 @@ export default function TitleDetailScreen({ route, navigation }: Props) {
   useEffect(() => {
     load();
   }, [load]);
+
+  // "Your watches" (Story 3.7) — primary content for the new section, not a
+  // best-effort hint (unlike the watchlist/tracked heart seeds below): a
+  // failure here sets a local inline error note rather than swallowing it or
+  // touching the whole-screen `phase` (the rest of the screen already
+  // rendered fine).
+  const loadWatches = useCallback(async () => {
+    const seq = ++watchesSeqRef.current;
+    try {
+      const rows = await getWatchesForTitle(tmdbId, mediaType);
+      if (!mountedRef.current || seq !== watchesSeqRef.current) return;
+      setWatches(rows);
+      setWatchesError(null);
+    } catch (err) {
+      console.warn('your watches: failed to load', err);
+      if (!mountedRef.current || seq !== watchesSeqRef.current) return;
+      setWatchesError(COPY_WATCHES_FAILED);
+    }
+  }, [tmdbId, mediaType]);
+
+  useEffect(() => {
+    loadWatches();
+  }, [loadWatches]);
+
+  // Flatten detail.seasons once into a tmdbEpisodeId → label lookup (Task 2)
+  // so each watch row can show "S2E4"-style identification without a second
+  // fetch — TitleDetailScreen already holds the full episode list once loaded.
+  const episodeLookup = useMemo(() => {
+    const map = new Map<number, { seasonNumber: number; episodeNumber: number }>();
+    if (detail?.seasons) {
+      for (const season of detail.seasons) {
+        for (const ep of season.episodes) {
+          map.set(ep.tmdbEpisodeId, { seasonNumber: season.seasonNumber, episodeNumber: ep.episodeNumber });
+        }
+      }
+    }
+    return map;
+  }, [detail]);
+
+  // A watch whose tmdbEpisodeId isn't found (stale cache, deleted episode)
+  // falls back to no label — never throws, never blocks the row from
+  // rendering (Task 2).
+  const episodeLabel = useCallback(
+    (tmdbEpisodeId: number | null): string | null => {
+      if (tmdbEpisodeId == null) return null;
+      const ep = episodeLookup.get(tmdbEpisodeId);
+      return ep ? `S${ep.seasonNumber}E${ep.episodeNumber}` : null;
+    },
+    [episodeLookup],
+  );
 
   // Best-effort initial heart state — guarded by mountedRef so a pop mid-fetch
   // doesn't setState. A failed lookup leaves the heart empty (acceptable
@@ -375,6 +448,34 @@ export default function TitleDetailScreen({ route, navigation }: Props) {
               ))}
             </View>
           )}
+
+          {/* "Your watches" (Story 3.7) — a separate list below the seasons
+              section, not a change to how episode rows render (3.4's scope
+              wall already declined a per-episode "already watched" badge).
+              Omitted entirely when empty — a title with zero watches simply
+              has no section, not an error/empty-state AC. */}
+          {watches.length > 0 && (
+            <View style={styles.seasons}>
+              <Text style={styles.sectionHeading} accessibilityRole="header">
+                Your watches
+              </Text>
+              {watches.map((watch) => (
+                <WatchRow
+                  key={watch.id}
+                  watch={watch}
+                  episodeLabel={episodeLabel(watch.tmdbEpisodeId)}
+                  onPress={() => setEditingWatch(watch)}
+                  styles={styles}
+                  theme={theme}
+                />
+              ))}
+            </View>
+          )}
+          {watchesError && (
+            <Text style={styles.stateText} accessibilityLiveRegion="polite">
+              {watchesError}
+            </Text>
+          )}
         </ScrollView>
       )}
 
@@ -388,6 +489,26 @@ export default function TitleDetailScreen({ route, navigation }: Props) {
           onLogged={() => {
             setBulkLogSeason(null);
             showConfirmation(COPY_SEASON_LOGGED);
+          }}
+        />
+      )}
+
+      {detail && (
+        <EditWatchSheet
+          watch={editingWatch}
+          visible={editingWatch != null}
+          tmdbId={tmdbId}
+          mediaType={mediaType}
+          onDismiss={() => setEditingWatch(null)}
+          onSaved={() => {
+            setEditingWatch(null);
+            loadWatches();
+            showConfirmation(COPY_WATCH_UPDATED);
+          }}
+          onRemoved={() => {
+            setEditingWatch(null);
+            loadWatches();
+            showConfirmation(COPY_WATCH_REMOVED);
           }}
         />
       )}
@@ -458,6 +579,48 @@ function SeasonRow({
         </Pressable>
       )}
     </View>
+  );
+}
+
+/** One logged-watch row (Story 3.7) — tap-to-act (AC3), no long-press. Read-only
+ *  summary of one watch: date, episode label (tv only), a disabled StarRating
+ *  readout, mood emoji, and a one-line note preview. */
+function WatchRow({
+  watch,
+  episodeLabel,
+  onPress,
+  styles,
+  theme,
+}: {
+  watch: LoggedWatch;
+  episodeLabel: string | null;
+  onPress: () => void;
+  styles: ReturnType<typeof makeStyles>;
+  theme: Theme;
+}) {
+  const date = new Date(watch.watchedAt).toLocaleDateString();
+  const metaParts = [episodeLabel, date].filter((part): part is string => !!part);
+  return (
+    <Pressable
+      onPress={onPress}
+      style={styles.watchRow}
+      accessibilityRole="button"
+      accessibilityLabel={`Edit watch from ${date}`}
+    >
+      <View style={styles.watchRowText}>
+        <Text style={styles.watchRowMeta}>{metaParts.join(' · ')}</Text>
+        <StarRating value={watch.rating} onChange={() => {}} disabled />
+        {watch.moods.length > 0 && (
+          <Text style={styles.watchRowMoods}>{watch.moods.join(' ')}</Text>
+        )}
+        {watch.note && (
+          <Text style={styles.watchRowNote} numberOfLines={1}>
+            {watch.note}
+          </Text>
+        )}
+      </View>
+      <Ionicons name="chevron-forward" size={18} color={theme.colors.inkSecondary} />
+    </Pressable>
   );
 }
 
@@ -559,5 +722,20 @@ function makeStyles(theme: Theme) {
       borderTopColor: colors.borderHairline,
     },
     markSeasonText: { ...type.label, color: colors.primary },
+    // "Your watches" row (Story 3.7) — 48pt min tap target (Accessibility
+    // Floor), full-width, same card language as seasonCard.
+    watchRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing.sm,
+      minHeight: 48,
+      padding: spacing.md,
+      backgroundColor: colors.surfaceRaised,
+      borderRadius: radius.md,
+    },
+    watchRowText: { flex: 1, gap: spacing.xs },
+    watchRowMeta: { ...type.label, color: colors.inkSecondary },
+    watchRowMoods: { ...type.body, color: colors.inkPrimary },
+    watchRowNote: { ...type.body, color: colors.inkSecondary, fontStyle: 'italic' },
   });
 }

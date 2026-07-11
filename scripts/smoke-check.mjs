@@ -657,6 +657,249 @@ if (anonKey) {
   }
 }
 
+// 11. Story 3.7's edit/remove hazards — cross-user RLS on PATCH/DELETE (not
+// just SELECT, which check 9 already proves), and the pointer RPC's backward-
+// derive path after a delete (Story 3.7 / AC1, AC2). No prior story's checks
+// exercise either: 9 only proves read-filtering, and every prior pointer-RPC
+// call (3.1/3.2/3.4) only ever advances forward from nothing or from a watch —
+// this is the first DELETE + backward recompute exercised here. -------------
+if (anonKey) {
+  const SMOKE_A = { email: 'smoke-test-a@tv-time-2.invalid', username: 'smoketestusera' };
+  const SMOKE_B = { email: 'smoke-test-b@tv-time-2.invalid', username: 'smoketestuserb' };
+  const SMOKE_D = { email: 'smoke-test-d@tv-time-2.invalid', username: 'smoketestuserd' };
+  const SMOKE_PASSWORD = 'Sm0ke-Test-Password!';
+  // Fixed literal UUIDs (not per-run) so reruns upsert/re-create the same rows
+  // rather than accumulating or PK-conflicting.
+  const EDIT_WATCH_ID = '00000000-0000-0000-0000-00000000ed17';
+  const POINTER_WATCH_EP1 = '00000000-0000-0000-0000-0000000090e1';
+  const POINTER_WATCH_EP2 = '00000000-0000-0000-0000-0000000090e2';
+  // Synthetic tmdb_id, clearly out of TMDB's real id space, so this fixture
+  // never collides with anything a real catalog-search/catalog-title call
+  // could have cached for this local stack.
+  const POINTER_TMDB_ID = 8880001;
+  const POINTER_EP1_ID = 900001;
+  const POINTER_EP2_ID = 900002;
+
+  async function getSession({ email, username }) {
+    const signInRes = await fetch(`${baseUrl}/auth/v1/token?grant_type=password`, {
+      method: 'POST',
+      headers: { apikey: anonKey, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password: SMOKE_PASSWORD }),
+      signal: AbortSignal.timeout(5000),
+    });
+    if (signInRes.ok) return signInRes.json();
+    const signUpRes = await fetch(`${baseUrl}/auth/v1/signup`, {
+      method: 'POST',
+      headers: { apikey: anonKey, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password: SMOKE_PASSWORD, data: { username, display_name: username } }),
+      signal: AbortSignal.timeout(5000),
+    });
+    if (!signUpRes.ok) throw new Error(`sign-in and sign-up both failed for ${email}`);
+    return signUpRes.json();
+  }
+
+  // 11a. RLS actually blocks a cross-user PATCH/DELETE, not just SELECT (check
+  // 9 already proves read-filtering) — proving Story 3.7 AC1/AC2's "guarded by
+  // owner-only RLS" isn't just a client-side assumption for edit/remove.
+  try {
+    const sessionA = await getSession(SMOKE_A);
+    const sessionB = await getSession(SMOKE_B);
+
+    const upsertRes = await fetch(`${baseUrl}/rest/v1/watches`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${sessionA.access_token}`,
+        apikey: anonKey,
+        'Content-Type': 'application/json',
+        Prefer: 'resolution=merge-duplicates',
+      },
+      body: JSON.stringify({
+        id: EDIT_WATCH_ID,
+        user_id: sessionA.user.id,
+        tmdb_id: 0,
+        media_type: 'movie',
+        watched_at: new Date().toISOString(),
+      }),
+      signal: AbortSignal.timeout(5000),
+    });
+    if (!upsertRes.ok) {
+      fail(`Story 3.7 AC1/AC2: could not seed user A's watch row for the cross-user edit/delete check (HTTP ${upsertRes.status}).`);
+    } else {
+      const patchRes = await fetch(`${baseUrl}/rest/v1/watches?id=eq.${EDIT_WATCH_ID}`, {
+        method: 'PATCH',
+        headers: {
+          Authorization: `Bearer ${sessionB.access_token}`,
+          apikey: anonKey,
+          'Content-Type': 'application/json',
+          Prefer: 'return=representation',
+        },
+        body: JSON.stringify({ rating: 3 }),
+        signal: AbortSignal.timeout(5000),
+      });
+      const patched = patchRes.ok ? await patchRes.json() : null;
+      if (patchRes.ok && Array.isArray(patched) && patched.length === 0) {
+        ok("Story 3.7 AC1: cross-user PATCH is RLS-filtered to 0 rows — user B cannot edit user A's watch.");
+      } else {
+        fail(
+          `Story 3.7 AC1: cross-user PATCH was NOT blocked (HTTP ${patchRes.status}, ${
+            Array.isArray(patched) ? `${patched.length} rows` : 'non-array/error'
+          }) — owner-only RLS regression on watches_update_own.`,
+        );
+      }
+
+      const deleteRes = await fetch(`${baseUrl}/rest/v1/watches?id=eq.${EDIT_WATCH_ID}`, {
+        method: 'DELETE',
+        headers: {
+          Authorization: `Bearer ${sessionB.access_token}`,
+          apikey: anonKey,
+          Prefer: 'return=representation',
+        },
+        signal: AbortSignal.timeout(5000),
+      });
+      const deleted = deleteRes.ok ? await deleteRes.json() : null;
+      if (deleteRes.ok && Array.isArray(deleted) && deleted.length === 0) {
+        ok("Story 3.7 AC2: cross-user DELETE is RLS-filtered to 0 rows — user B cannot remove user A's watch.");
+      } else {
+        fail(
+          `Story 3.7 AC2: cross-user DELETE was NOT blocked (HTTP ${deleteRes.status}, ${
+            Array.isArray(deleted) ? `${deleted.length} rows` : 'non-array/error'
+          }) — owner-only RLS regression on watches_delete_own.`,
+        );
+      }
+    }
+  } catch (err) {
+    fail(`Story 3.7 cross-user edit/delete RLS check failed: ${err.message}`);
+  }
+
+  // 11b. The pointer RPC correctly moves a pointer BACKWARD after a delete —
+  // no prior story's checks exercise this direction (3.1 is forward/init-only,
+  // 3.4 is forward-bulk-only). Direct proof of AC2's "derive-from-full-watch-
+  // set... can move the pointer backward correctly."
+  try {
+    const sessionD = await getSession(SMOKE_D);
+    const userId = sessionD.user.id;
+    const authHeaders = {
+      Authorization: `Bearer ${sessionD.access_token}`,
+      apikey: anonKey,
+      'Content-Type': 'application/json',
+    };
+
+    // Seed catalog_cache directly (psql) — the RPC's only source of episode
+    // ordering, and a table with zero grants for authenticated (0002), so
+    // this cannot be written via PostgREST. Upserted so reruns don't conflict
+    // on the (tmdb_id, media_type) primary key.
+    const payload = JSON.stringify({
+      tmdbId: POINTER_TMDB_ID,
+      mediaType: 'tv',
+      title: 'Smoke Test Show',
+      year: '2020',
+      posterPath: null,
+      synopsis: null,
+      seasons: [
+        {
+          seasonNumber: 1,
+          name: 'Season 1',
+          episodes: [
+            { episodeNumber: 1, name: 'Episode 1', airDate: null, tmdbEpisodeId: POINTER_EP1_ID },
+            { episodeNumber: 2, name: 'Episode 2', airDate: null, tmdbEpisodeId: POINTER_EP2_ID },
+          ],
+        },
+      ],
+    }).replace(/'/g, "''");
+    runPsql(
+      `insert into public.catalog_cache (tmdb_id, media_type, payload, fetched_at) ` +
+        `values (${POINTER_TMDB_ID}, 'tv', '${payload}'::jsonb, now()) ` +
+        `on conflict (tmdb_id, media_type) do update set payload = excluded.payload, fetched_at = excluded.fetched_at;`,
+    );
+
+    // Track the synthetic show — `ignore-duplicates` (ON CONFLICT DO NOTHING),
+    // not `merge-duplicates` (which needs an UPDATE grant this table
+    // deliberately has none of, per 0006's grants note); the exact Prefer
+    // header trackShow()'s own `ignoreDuplicates: true` upsert sends.
+    const trackRes = await fetch(
+      `${baseUrl}/rest/v1/tracked_shows?on_conflict=user_id,tmdb_id,media_type`,
+      {
+        method: 'POST',
+        headers: { ...authHeaders, Prefer: 'resolution=ignore-duplicates' },
+        body: JSON.stringify({ user_id: userId, tmdb_id: POINTER_TMDB_ID, media_type: 'tv' }),
+        signal: AbortSignal.timeout(5000),
+      },
+    );
+    if (!trackRes.ok) throw new Error(`could not track the synthetic show (HTTP ${trackRes.status})`);
+
+    async function upsertPointerWatch(id, tmdbEpisodeId) {
+      const res = await fetch(`${baseUrl}/rest/v1/watches`, {
+        method: 'POST',
+        headers: { ...authHeaders, Prefer: 'resolution=merge-duplicates' },
+        body: JSON.stringify({
+          id,
+          user_id: userId,
+          tmdb_id: POINTER_TMDB_ID,
+          media_type: 'tv',
+          tmdb_episode_id: tmdbEpisodeId,
+          watched_at: new Date().toISOString(),
+        }),
+        signal: AbortSignal.timeout(5000),
+      });
+      if (!res.ok) throw new Error(`could not upsert watch ${id} (HTTP ${res.status})`);
+    }
+
+    async function callRecompute() {
+      const res = await fetch(`${baseUrl}/rest/v1/rpc/recompute_next_episode_pointer`, {
+        method: 'POST',
+        headers: authHeaders,
+        body: JSON.stringify({
+          p_user_id: userId,
+          p_tmdb_id: POINTER_TMDB_ID,
+          p_media_type: 'tv',
+        }),
+        signal: AbortSignal.timeout(5000),
+      });
+      if (!res.ok) throw new Error(`recompute_next_episode_pointer failed (HTTP ${res.status})`);
+      return res.json();
+    }
+
+    // Log episode 1 only, then recompute — pointer should land on episode 2
+    // (the first unwatched episode), establishing a forward pointer.
+    await upsertPointerWatch(POINTER_WATCH_EP1, POINTER_EP1_ID);
+    const forwardPointer = await callRecompute();
+    if (forwardPointer !== POINTER_EP2_ID) {
+      fail(
+        `Story 3.7 AC2 setup: expected the forward pointer to land on episode 2 (${POINTER_EP2_ID}) after logging episode 1, got ${JSON.stringify(forwardPointer)}.`,
+      );
+    }
+
+    // Log episode 2 too, then recompute — fully caught up, pointer null.
+    await upsertPointerWatch(POINTER_WATCH_EP2, POINTER_EP2_ID);
+    const caughtUpPointer = await callRecompute();
+    if (caughtUpPointer !== null) {
+      fail(
+        `Story 3.7 AC2 setup: expected a null (fully caught up) pointer after logging both episodes, got ${JSON.stringify(caughtUpPointer)}.`,
+      );
+    }
+
+    // Remove (un-log) episode 2's watch directly, then recompute — the
+    // pointer must move BACKWARD to episode 2 again, derived from the now-
+    // smaller watch set, not left at wherever it was before the delete.
+    const deleteRes = await fetch(`${baseUrl}/rest/v1/watches?id=eq.${POINTER_WATCH_EP2}`, {
+      method: 'DELETE',
+      headers: authHeaders,
+      signal: AbortSignal.timeout(5000),
+    });
+    if (!deleteRes.ok) throw new Error(`could not delete episode 2's watch (HTTP ${deleteRes.status})`);
+    const backwardPointer = await callRecompute();
+    if (backwardPointer === POINTER_EP2_ID) {
+      ok('Story 3.7 AC2: removing a watch moves the pointer BACKWARD to the now-unwatched episode, derived from the full remaining watch set.');
+    } else {
+      fail(
+        `Story 3.7 AC2: pointer did NOT move backward after removing episode 2's watch (expected ${POINTER_EP2_ID}, got ${JSON.stringify(backwardPointer)}) — the RPC's derive-not-increment contract broke for the delete direction.`,
+      );
+    }
+  } catch (err) {
+    fail(`Story 3.7 backward-pointer check failed: ${err.message}`);
+  }
+}
+
 // Result ----------------------------------------------------------------------
 if (failures > 0) {
   console.error(`\nSmoke check FAILED with ${failures} problem(s).`);

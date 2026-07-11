@@ -11,8 +11,8 @@
 // to show and we do not fabricate placeholder stars. The ❤️ Add-to-Watchlist
 // affordance (2.3) also lands here later; a TODO marks where.
 
-import { useState } from 'react';
-import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
+import { useEffect, useRef, useState } from 'react';
+import { AccessibilityInfo, Animated, Image, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -23,6 +23,11 @@ import { posterUrl, type CatalogResult } from '../data/catalog';
 
 const CARD_POSTER_W = 60;
 const CARD_POSTER_H = 90;
+
+// ✓ tick particle burst (see `watchedParticle` below) — 8 dots evenly spaced
+// around the button, flying out to this radius on tap.
+const PARTICLE_ANGLES = Array.from({ length: 8 }, (_, i) => (i / 8) * Math.PI * 2);
+const PARTICLE_DISTANCE = 22;
 
 const absoluteFill = { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0 } as const;
 
@@ -108,6 +113,8 @@ export function TitleCard({
   onMarkWatched,
   watchedPending = false,
   watchedIcon = false,
+  watchedAlready = false,
+  subtitle,
 }: {
   item: CatalogResult;
   onPress?: (item: CatalogResult) => void;
@@ -117,16 +124,56 @@ export function TitleCard({
   watchlisted?: boolean;
   onMarkWatched?: (item: CatalogResult) => void;
   watchedPending?: boolean;
-  // Watched shelf (HomeScreen): swap the text pill for a round green tick —
-  // the item is already known-watched there, so "Watched" as a label is
-  // redundant; tapping still logs a rewatch via onMarkWatched (AD-3).
+  // Up Next / Watched shelf (HomeScreen): swap the text pill for a round green
+  // tick icon button — a smooth pulse-ring animation plays around it on tap
+  // (see `pulseAnim` below) so the tap reads as a satisfying confirmation
+  // rather than a plain state flip.
   watchedIcon?: boolean;
+  // Watched shelf only (HomeScreen): the item is already known-watched, so
+  // tapping the tick logs a rewatch (AD-3) rather than a first watch — swaps
+  // the icon button's accessibility label accordingly. Up Next omits this
+  // (defaults false): its tick always marks a first watch.
+  watchedAlready?: boolean;
+  // Up Next shelf (tv only): "S{season}E{episode} · {episode name}" for the
+  // show's next unwatched episode, so the card reads as "what you're partway
+  // through" rather than the show in the abstract. Omitted (undefined) by
+  // every other surface — Search/Watchlist/Recommendations cards are unchanged.
+  subtitle?: string | null;
 }) {
   const theme = useTheme();
   const styles = makeStyles(theme);
 
   const typeLabel = item.mediaType === 'tv' ? 'TV' : 'Film';
   const meta = [item.year, typeLabel].filter(Boolean).join(' · ');
+
+  // ✓ tick tap animation — a ring pulses outward and a handful of particles
+  // burst out around the button (mirrors RatingPrompt/EditWatchSheet/
+  // AddScreen's existing Reduce Motion pattern: skip the animation entirely,
+  // the tap still marks watched — the icon still flips gray→green instantly).
+  const pulseAnim = useRef(new Animated.Value(0)).current;
+  const [reduceMotion, setReduceMotion] = useState(false);
+  // Gray at rest, green once this card's tick has been confirmed — either
+  // because it tapped "watched" this session, or (Watched shelf) it already
+  // was watched when the card mounted.
+  const [confirmed, setConfirmed] = useState(watchedAlready);
+  useEffect(() => {
+    AccessibilityInfo.isReduceMotionEnabled().then(setReduceMotion);
+    const sub = AccessibilityInfo.addEventListener('reduceMotionChanged', setReduceMotion);
+    return () => sub.remove();
+  }, []);
+
+  function handleMarkWatchedPress() {
+    if (!onMarkWatched) return;
+    onMarkWatched(item);
+    setConfirmed(true);
+    if (reduceMotion) return;
+    pulseAnim.setValue(0);
+    Animated.timing(pulseAnim, {
+      toValue: 1,
+      duration: 500,
+      useNativeDriver: true,
+    }).start();
+  }
 
   return (
     <Pressable
@@ -135,13 +182,18 @@ export function TitleCard({
       disabled={!onPress}
       accessibilityRole={onPress ? 'button' : undefined}
       accessible
-      accessibilityLabel={`${item.title}, ${item.year ?? 'year unknown'}, ${typeLabel}${logged ? ', already watched' : ''}`}
+      accessibilityLabel={`${item.title}${subtitle ? `, ${subtitle}` : ''}, ${item.year ?? 'year unknown'}, ${typeLabel}${logged ? ', already watched' : ''}`}
     >
       <Poster posterPath={item.posterPath} />
       <View style={styles.cardText}>
         <Text style={styles.cardTitle} numberOfLines={2}>
           {item.title}
         </Text>
+        {subtitle && (
+          <Text style={styles.cardSubtitle} numberOfLines={1}>
+            {subtitle}
+          </Text>
+        )}
         <Text style={styles.cardMeta}>{meta}</Text>
         {/* Star row / mood chips slot (UX-DR6). Empty until Epic 3 adds
             rating/mood data — no placeholder stars (see scope wall). */}
@@ -200,23 +252,79 @@ export function TitleCard({
           of this story's review) the Watchlist's own "Watched" shelf too, so
           a rewatch can be logged from there (AD-3). */}
       {onMarkWatched && watchedIcon && (
-        <Pressable
-          onPress={() => onMarkWatched(item)}
-          disabled={watchedPending}
-          style={({ pressed }) => [styles.iconButton, pressed && styles.iconButtonPressed]}
-          hitSlop={8}
-          accessibilityRole="button"
-          accessibilityState={{ disabled: watchedPending }}
-          accessibilityLabel={
-            watchedPending ? `${item.title} marked watched` : `Log another watch of ${item.title}`
-          }
-        >
-          <Ionicons name="checkmark-circle" size={28} color={theme.colors.success} />
-        </Pressable>
+        <View style={styles.watchedIconWrap}>
+          <Animated.View
+            pointerEvents="none"
+            style={[
+              styles.watchedPulseRing,
+              {
+                opacity: pulseAnim.interpolate({ inputRange: [0, 1], outputRange: [0.6, 0] }),
+                transform: [
+                  { scale: pulseAnim.interpolate({ inputRange: [0, 1], outputRange: [1, 1.6] }) },
+                ],
+              },
+            ]}
+          />
+          {/* Particle burst — a small ring of dots flies outward and fades as
+              the tick flips gray→green (see `confirmed`), so the switch reads
+              as a little celebration rather than a plain color swap. Purely
+              decorative (pointerEvents none) and skipped under Reduce Motion
+              since `pulseAnim` never advances there. */}
+          {PARTICLE_ANGLES.map((angle) => (
+            <Animated.View
+              key={angle}
+              pointerEvents="none"
+              style={[
+                styles.watchedParticle,
+                {
+                  opacity: pulseAnim.interpolate({ inputRange: [0, 0.15, 1], outputRange: [0, 1, 0] }),
+                  transform: [
+                    {
+                      translateX: pulseAnim.interpolate({
+                        inputRange: [0, 1],
+                        outputRange: [0, Math.cos(angle) * PARTICLE_DISTANCE],
+                      }),
+                    },
+                    {
+                      translateY: pulseAnim.interpolate({
+                        inputRange: [0, 1],
+                        outputRange: [0, Math.sin(angle) * PARTICLE_DISTANCE],
+                      }),
+                    },
+                    {
+                      scale: pulseAnim.interpolate({ inputRange: [0, 0.3, 1], outputRange: [0.4, 1, 0.2] }),
+                    },
+                  ],
+                },
+              ]}
+            />
+          ))}
+          <Pressable
+            onPress={handleMarkWatchedPress}
+            disabled={watchedPending}
+            style={({ pressed }) => [styles.iconButton, pressed && styles.iconButtonPressed]}
+            hitSlop={8}
+            accessibilityRole="button"
+            accessibilityState={{ disabled: watchedPending }}
+            accessibilityLabel={
+              watchedPending
+                ? `${item.title} marked watched`
+                : watchedAlready
+                  ? `Log another watch of ${item.title}`
+                  : `Mark ${item.title} watched`
+            }
+          >
+            <Ionicons
+              name="checkmark-circle"
+              size={28}
+              color={confirmed ? theme.colors.success : theme.colors.inkSecondary}
+            />
+          </Pressable>
+        </View>
       )}
       {onMarkWatched && !watchedIcon && (
         <Pressable
-          onPress={() => onMarkWatched(item)}
+          onPress={handleMarkWatchedPress}
           disabled={watchedPending}
           style={({ pressed }) => [
             styles.watchedPill,
@@ -266,6 +374,37 @@ function makeStyles(theme: Theme) {
       alignSelf: 'center',
     },
     iconButtonPressed: { backgroundColor: colors.surfaceSunken },
+    // Wraps the ✓ tick button so `watchedPulseRing` can be absolutely
+    // positioned centered behind/around it at the same 44pt size.
+    watchedIconWrap: {
+      width: 44,
+      height: 44,
+      alignItems: 'center',
+      justifyContent: 'center',
+      alignSelf: 'center',
+    },
+    // The tap-confirmation ring (see `pulseAnim`) — a bare circle outline that
+    // scales up and fades out around the tick button, never color-only signal
+    // (the icon itself already fills solid green on tap).
+    watchedPulseRing: {
+      position: 'absolute',
+      width: 40,
+      height: 40,
+      borderRadius: 20,
+      borderWidth: 2,
+      borderColor: colors.success,
+    },
+    // One dot of the tap particle-burst (see `PARTICLE_ANGLES`) — centered on
+    // the 44pt button, animated outward via translateX/Y + opacity + scale.
+    watchedParticle: {
+      position: 'absolute',
+      top: 19,
+      left: 19,
+      width: 6,
+      height: 6,
+      borderRadius: 3,
+      backgroundColor: colors.success,
+    },
     // The `watched-badge` component (DESIGN.md) — mirrors the retryButton/
     // retryText pair's colors (primary fill, inkPrimary text), rounded-sm,
     // uppercase label.
@@ -283,6 +422,7 @@ function makeStyles(theme: Theme) {
     watchedPillText: { ...type.label, color: colors.inkPrimary, textTransform: 'uppercase' },
     cardText: { flex: 1, justifyContent: 'center', gap: spacing.xs },
     cardTitle: { ...type.cardTitle, color: colors.inkPrimary },
+    cardSubtitle: { ...type.meta, color: colors.primary },
     cardMeta: { ...type.meta, color: colors.inkSecondary },
   });
 }

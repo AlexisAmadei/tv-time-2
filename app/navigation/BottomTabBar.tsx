@@ -23,7 +23,7 @@ const FAB_ROUTE = 'Add';
 /** Feather icon per tab route (the FAB route is handled separately). */
 const TAB_ICONS: Record<string, keyof typeof Feather.glyphMap> = {
   Home: 'home',
-  Diary: 'book',
+  Recommendations: 'compass',
   Feed: 'rss',
   Profile: 'user',
 };
