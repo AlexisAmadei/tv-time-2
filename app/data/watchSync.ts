@@ -14,10 +14,13 @@ interface PendingWatchRow {
   tmdb_episode_id: number | null;
   watched_at: string;
   rating: number | null;
-  mood: string | null;
+  // JSON-encoded emoji array (Story 3.5) — replaces the dead singular `mood`.
+  moods: string | null;
   note: string | null;
   synced_at: string | null;
   created_at: string;
+  reaction_rev: number | null;
+  synced_rev: number | null;
 }
 
 // Guards overlapping triggers so concurrent calls (e.g. a reconnect firing
@@ -72,8 +75,16 @@ export async function triggerSync(): Promise<void> {
       // Owner-filtered: only drain rows belonging to the current user, so a
       // pending watch created by a previously signed-in account is never
       // attributed to this one.
+      //
+      // Two reasons a row is drained (Story 3.5): it has never synced
+      // (`synced_at is null`), OR its reaction changed after it synced
+      // (`synced_rev <> reaction_rev`) — the latter re-upserts the same row in
+      // place (onConflict:'id') to carry a rating/mood edit that happened after
+      // the commit reached the server.
       const rows = await db.getAllAsync<PendingWatchRow>(
-        'select * from pending_watches where synced_at is null and user_id = ?',
+        `select * from pending_watches
+         where user_id = ?
+           and (synced_at is null or coalesce(synced_rev, -1) <> coalesce(reaction_rev, 0))`,
         [userId],
       );
       if (rows.length === 0) break;
@@ -81,6 +92,31 @@ export async function triggerSync(): Promise<void> {
       let progressed = false;
       for (const row of rows) {
         try {
+          // Snapshot the reaction state BEFORE the upsert. If the user rates
+          // this row again while the upsert below is in flight, `reaction_rev`
+          // advances past `snapshotRev` — so writing `synced_rev = snapshotRev`
+          // (not a re-read of the current value) leaves synced_rev < reaction_rev,
+          // the selection predicate still matches, and the next pass re-upserts
+          // with the newer reaction. This is the lost-update guard (Story 3.5,
+          // Dev Notes "Why a revision counter, not a dirty flag"); a re-read
+          // here would silently drop exactly the ratings tapped during a sync.
+          const snapshotRev = row.reaction_rev ?? 0;
+          const wasUnsynced = row.synced_at == null;
+          // Local `pending_watches.moods` is a JSON-encoded array (Story 3.5);
+          // the server `watches.mood` is `text[]` (0003). Decode at the sync
+          // boundary — the one place the singular/plural seam lives. A corrupt
+          // value degrades to null rather than throwing this row out of the
+          // drain forever.
+          let moods: string[] | null = null;
+          if (row.moods) {
+            try {
+              const parsed = JSON.parse(row.moods);
+              moods = Array.isArray(parsed) && parsed.length ? parsed : null;
+            } catch (err) {
+              console.warn(`watchSync: bad moods JSON for ${row.id}, sending null`, err);
+            }
+          }
+
           // upsert keyed on the client-generated id — a retry after an
           // already-successful-but-unconfirmed insert is a no-op, never a
           // duplicate row or a unique-constraint error that would abort the
@@ -101,11 +137,7 @@ export async function triggerSync(): Promise<void> {
                   tmdb_episode_id: row.tmdb_episode_id,
                   watched_at: row.watched_at,
                   rating: row.rating,
-                  // Local `pending_watches.mood` is a bare `text` (db.ts); the
-                  // server `watches.mood` is `text[]` (0003) — wrap into a
-                  // single-element array here, at the sync boundary, rather
-                  // than changing the local column's shape.
-                  mood: row.mood ? [row.mood] : null,
+                  mood: moods,
                   note: row.note,
                 },
                 { onConflict: 'id' },
@@ -120,18 +152,23 @@ export async function triggerSync(): Promise<void> {
           }
           if (failed) continue;
 
-          await db.runAsync('update pending_watches set synced_at = ? where id = ?', [
-            new Date().toISOString(),
-            row.id,
-          ]);
+          // Mark synced AND record which reaction rev this upsert carried. A
+          // reaction-only re-sync leaves synced_at as-is (coalesce keeps the
+          // original timestamp) but advances synced_rev to the snapshotted rev.
+          await db.runAsync(
+            'update pending_watches set synced_at = coalesce(synced_at, ?), synced_rev = ? where id = ?',
+            [new Date().toISOString(), snapshotRev, row.id],
+          );
           progressed = true;
 
           // Organic pointer advance (Story 3.2, AC1/AC2/AC4): a side effect of
           // this row's own successful upsert, never a raw PATCH on
-          // tracked_shows. Just collect the tmdb_id here — the actual RPC call
-          // happens once per drain, after every pass has finished (see the
-          // comment on `recomputeTmdbIds` above).
-          if (row.media_type === 'tv' && row.tmdb_episode_id != null) {
+          // tracked_shows. Gated additionally on `wasUnsynced` (Story 3.5) so a
+          // reaction-only re-sync of an already-synced episode does NOT fire a
+          // pointer RPC — the RPC is idempotent (AD-10), so a stray call is
+          // harmless to correctness, but a rating tap must not put a network
+          // call behind an interaction the ACs describe as never blocking.
+          if (wasUnsynced && row.media_type === 'tv' && row.tmdb_episode_id != null) {
             recomputeTmdbIds.add(row.tmdb_id);
           }
         } catch (err) {

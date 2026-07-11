@@ -464,6 +464,199 @@ if (anonKey) {
   }
 }
 
+// 10. Story 3.5's outbox invariants — the reaction hazards AC2/AC3/AC5 depend
+// on, pinned server-side (Story 3.5 / AC3 "named regression test, must be
+// automated"). No test framework exists (restated every story since 1.3), so
+// these live here alongside 1.6's cross-user RLS check, in the same
+// ok()/fail() + fixed-smoke-account style. They pin the SERVER-SIDE invariants;
+// they cannot execute setWatchReaction's expo-sqlite branch (no node harness in
+// this repo can) — that gap is Open Question 1 in the story. Extended by
+// Story 3.6 (10d/10e) to cover the note field on the same REACTION_WATCH_ID
+// fixture, since it widens this exact upsert/PATCH contract.
+if (anonKey) {
+  const SMOKE_C = { email: 'smoke-test-c@tv-time-2.invalid', username: 'smoketestuserc' };
+  const SMOKE_PASSWORD = 'Sm0ke-Test-Password!';
+  // Fixed literal UUIDs (not per-run) so reruns upsert the same rows in place
+  // rather than accumulating or PK-conflicting.
+  const REACTION_WATCH_ID = '00000000-0000-0000-0000-00000000cafe';
+  const MISSING_WATCH_ID = '00000000-0000-0000-0000-0000deadbeef';
+
+  async function getSession({ email, username }) {
+    const signInRes = await fetch(`${baseUrl}/auth/v1/token?grant_type=password`, {
+      method: 'POST',
+      headers: { apikey: anonKey, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password: SMOKE_PASSWORD }),
+      signal: AbortSignal.timeout(5000),
+    });
+    if (signInRes.ok) return signInRes.json();
+    const signUpRes = await fetch(`${baseUrl}/auth/v1/signup`, {
+      method: 'POST',
+      headers: { apikey: anonKey, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password: SMOKE_PASSWORD, data: { username, display_name: username } }),
+      signal: AbortSignal.timeout(5000),
+    });
+    if (!signUpRes.ok) throw new Error(`sign-in and sign-up both failed for ${email}`);
+    return signUpRes.json();
+  }
+
+  try {
+    const session = await getSession(SMOKE_C);
+    const authHeaders = {
+      Authorization: `Bearer ${session.access_token}`,
+      apikey: anonKey,
+      'Content-Type': 'application/json',
+    };
+
+    // 10a. A bare PATCH against a not-yet-existing watches row is a silent
+    // no-op — never an error, never an insert. This is the REASON AC2 branches
+    // on synced_at instead of blind-PATCHing: an unguarded reaction write
+    // against a still-pending row would be lost with no error surface. Assert
+    // the silent no-op explicitly so a future PostgREST that starts erroring
+    // (or upserting) here trips this check. `Prefer: return=representation`
+    // makes PostgREST return the affected rows.
+    const patchRes = await fetch(`${baseUrl}/rest/v1/watches?id=eq.${MISSING_WATCH_ID}`, {
+      method: 'PATCH',
+      headers: { ...authHeaders, Prefer: 'return=representation' },
+      body: JSON.stringify({ rating: 8 }),
+      signal: AbortSignal.timeout(5000),
+    });
+    const patched = patchRes.ok ? await patchRes.json() : null;
+    if (patchRes.ok && Array.isArray(patched) && patched.length === 0) {
+      ok('Story 3.5 AC3: a bare PATCH at a not-yet-existing watches row is a silent no-op (0 rows) — the hazard AC2 guards.');
+    } else {
+      fail(
+        `Story 3.5 AC3: bare PATCH at a missing watches row was NOT a silent no-op (HTTP ${patchRes.status}, ${
+          Array.isArray(patched) ? `${patched.length} rows` : 'non-array/error'
+        }) — the assumption behind AC2's synced_at branch broke.`,
+      );
+    }
+
+    // 10b. One upsert carrying rating + mood together lands exactly one row
+    // with both set (AC3's success path — the shape the outbox emits for a
+    // pending row), and a re-upsert of the same id updates in place, staying
+    // one row (AC5 "that watch's row updates" + 1.5's onConflict idempotency).
+    async function upsertReaction(rating, mood, note) {
+      const res = await fetch(`${baseUrl}/rest/v1/watches`, {
+        method: 'POST',
+        headers: { ...authHeaders, Prefer: 'resolution=merge-duplicates,return=representation' },
+        body: JSON.stringify({
+          id: REACTION_WATCH_ID,
+          user_id: session.user.id,
+          tmdb_id: 0,
+          media_type: 'movie',
+          watched_at: new Date().toISOString(),
+          rating,
+          mood,
+          ...(note !== undefined ? { note } : {}),
+        }),
+        signal: AbortSignal.timeout(5000),
+      });
+      if (!res.ok) throw new Error(`upsert failed (HTTP ${res.status}): ${await res.text().catch(() => '')}`);
+      return res.json();
+    }
+
+    const firstRows = await upsertReaction(9, ['😭', '🔥']);
+    const first = Array.isArray(firstRows) ? firstRows[0] : null;
+    const moodRoundTrips =
+      first && Array.isArray(first.mood) && first.mood.length === 2 &&
+      first.mood.includes('😭') && first.mood.includes('🔥');
+    if (first && first.rating === 9 && moodRoundTrips) {
+      ok('Story 3.5 AC3/AC4: one upsert lands a single watches row with rating + two-element mood[] set (both round-trip).');
+    } else {
+      fail(
+        `Story 3.5 AC3/AC4: upsert did not round-trip rating + mood[] (rating=${first?.rating}, mood=${JSON.stringify(first?.mood)}).`,
+      );
+    }
+
+    // Re-upsert the same id with a changed rating — must stay ONE row, updated.
+    const secondRows = await upsertReaction(4, ['🥰']);
+    const second = Array.isArray(secondRows) ? secondRows[0] : null;
+    const countRes = await fetch(`${baseUrl}/rest/v1/watches?select=id&id=eq.${REACTION_WATCH_ID}`, {
+      headers: { Authorization: `Bearer ${session.access_token}`, apikey: anonKey },
+      signal: AbortSignal.timeout(5000),
+    });
+    const countRows = countRes.ok ? await countRes.json() : null;
+    if (second && second.rating === 4 && Array.isArray(countRows) && countRows.length === 1) {
+      ok('Story 3.5 AC5: re-upserting the same id updates that row in place (rating changed, still exactly one row).');
+    } else {
+      fail(
+        `Story 3.5 AC5: re-upsert did not update in place (rating=${second?.rating}, row count=${
+          Array.isArray(countRows) ? countRows.length : 'n/a'
+        }).`,
+      );
+    }
+
+    // 10c. AC4 "validated in the DB, not only client-side": 0008's CHECK
+    // rejects a non-locked mood value, and accepts a TWO-element locked array
+    // (the direct proof 3.5's 0–2 selection needs no new migration).
+    const badRes = await fetch(`${baseUrl}/rest/v1/watches`, {
+      method: 'POST',
+      headers: { ...authHeaders, Prefer: 'resolution=merge-duplicates' },
+      body: JSON.stringify({
+        id: REACTION_WATCH_ID,
+        user_id: session.user.id,
+        tmdb_id: 0,
+        media_type: 'movie',
+        watched_at: new Date().toISOString(),
+        mood: ['😭', '🚫'], // 🚫 is not in the locked FR18 set
+      }),
+      signal: AbortSignal.timeout(5000),
+    });
+    if (badRes.status >= 400) {
+      ok(`Story 3.5 AC4: the 0008 mood CHECK rejects a non-locked value server-side (HTTP ${badRes.status}).`);
+    } else {
+      fail(`Story 3.5 AC4: a non-locked mood value was accepted (HTTP ${badRes.status}) — 0008 CHECK regression.`);
+    }
+
+    const twoRes = await fetch(`${baseUrl}/rest/v1/watches`, {
+      method: 'POST',
+      headers: { ...authHeaders, Prefer: 'resolution=merge-duplicates' },
+      body: JSON.stringify({
+        id: REACTION_WATCH_ID,
+        user_id: session.user.id,
+        tmdb_id: 0,
+        media_type: 'movie',
+        watched_at: new Date().toISOString(),
+        mood: ['😱', '😂'],
+      }),
+      signal: AbortSignal.timeout(5000),
+    });
+    if (twoRes.ok) {
+      ok('Story 3.5 AC4: a two-element locked mood array is accepted — the 0–2 selection needs no new migration.');
+    } else {
+      fail(`Story 3.5 AC4: a valid two-element locked mood array was rejected (HTTP ${twoRes.status}).`);
+    }
+
+    // 10d. Story 3.6 AC1/AC3: a note round-trips through the same upsert path,
+    // alongside rating/mood, on the SAME REACTION_WATCH_ID row already
+    // exercised above — proving "stored on that watches row" without a second
+    // fixture.
+    const NOTE_TEXT = 'Cried during the finale.';
+    const notedRows = await upsertReaction(7, ['😭'], NOTE_TEXT);
+    const noted = Array.isArray(notedRows) ? notedRows[0] : null;
+    if (noted && noted.note === NOTE_TEXT) {
+      ok('Story 3.6 AC1/AC3: a note round-trips through the upsert, alongside rating/mood, on the same watches row.');
+    } else {
+      fail(`Story 3.6 AC1/AC3: note did not round-trip (got ${JSON.stringify(noted?.note)}).`);
+    }
+
+    // 10e. Story 3.6 AC2: no server-side length CHECK exists — the client
+    // ~500-char cap is the only enforcement. A 600-char note must be accepted
+    // (HTTP < 400); this is the direct proof that a future migration adding a
+    // CHECK here would be an unauthorized, silently-breaking change.
+    const longNote = 'x'.repeat(600);
+    const longRows = await upsertReaction(7, ['😭'], longNote);
+    const longRow = Array.isArray(longRows) ? longRows[0] : null;
+    if (longRow && longRow.note === longNote) {
+      ok('Story 3.6 AC2: a 600-char note is accepted server-side — the 500-char cap is a client-only UI rule, not a DB CHECK.');
+    } else {
+      fail('Story 3.6 AC2: a 600-char note was rejected or truncated — a DB-level length CHECK may have been added without a story authorizing it.');
+    }
+  } catch (err) {
+    fail(`Story 3.5/3.6 reaction-invariant checks failed: ${err.message}`);
+  }
+}
+
 // Result ----------------------------------------------------------------------
 if (failures > 0) {
   console.error(`\nSmoke check FAILED with ${failures} problem(s).`);

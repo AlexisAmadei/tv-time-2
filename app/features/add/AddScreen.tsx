@@ -33,6 +33,7 @@ import {
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 
+import RatingPrompt from '../../components/RatingPrompt';
 import { Screen } from '../../components/Screen';
 import { TitleCard } from '../../components/TitleCard';
 import { useTheme } from '../../theme/ThemeProvider';
@@ -79,6 +80,8 @@ export default function AddScreen() {
   // optimistically the instant a ❤️ tap toggles one.
   const [watchlistKeys, setWatchlistKeys] = useState<Set<string>>(new Set());
   const [reduceMotion, setReduceMotion] = useState(false);
+  // Post-watch rating prompt (Story 3.5) — opened with the id logWatch returns.
+  const [promptWatchId, setPromptWatchId] = useState<string | null>(null);
 
   // Synchronous mirror of `watchlistKeys` so a tap reads the true current
   // membership even for a second tap that lands in the same render frame (state
@@ -174,9 +177,13 @@ export default function AddScreen() {
   const handleLog = useCallback(
     (item: CatalogResult) => {
       logWatch({ tmdbId: item.tmdbId, mediaType: item.mediaType })
-        .then(() => {
+        .then((watchId) => {
           setLoggedKeys((prev) => new Set(prev).add(watchKey(item.tmdbId, item.mediaType)));
           showToast(COPY_LOGGED);
+          // Offer the post-watch rating prompt (Story 3.5, AC1). It's a Modal,
+          // so it composes with the animated toast without fighting it for the
+          // same screen region.
+          setPromptWatchId(watchId);
         })
         .catch((err) => {
           console.warn('logWatch failed', err);
@@ -394,6 +401,12 @@ export default function AddScreen() {
           <Text style={styles.toastText}>{toastMsg}</Text>
         </Animated.View>
       )}
+
+      <RatingPrompt
+        watchId={promptWatchId}
+        visible={promptWatchId != null}
+        onDismiss={() => setPromptWatchId(null)}
+      />
     </Screen>
   );
 }

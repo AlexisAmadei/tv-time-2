@@ -20,10 +20,12 @@
 // of the two separate per-shelf empty rows. A shelf still loading/erroring is
 // "not yet decided" and keeps showing its own state.
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
+  NativeScrollEvent,
+  NativeSyntheticEvent,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -35,6 +37,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
+import RatingPrompt from '../../components/RatingPrompt';
 import { Screen } from '../../components/Screen';
 import { TitleCard } from '../../components/TitleCard';
 import { useTheme } from '../../theme/ThemeProvider';
@@ -75,6 +78,16 @@ const COPY_ERROR = "We couldn't load this right now.";
 
 const SHELF_CARD_WIDTH = 280;
 
+// Series/Movies tabs — swipeable, mirrors the native tab-bar pattern (tap OR
+// horizontal swipe). No pager library is installed and this app is pinned to
+// Expo SDK 56 (see app/AGENTS.md — SDK bumps are a correct-course decision,
+// not a drive-by), so this uses a plain paging ScrollView rather than adding
+// a new native dependency.
+const MEDIA_TABS: { key: 'tv' | 'movie'; label: string }[] = [
+  { key: 'tv', label: 'Series' },
+  { key: 'movie', label: 'Movies' },
+];
+
 type Phase = 'loading' | 'loaded' | 'error';
 
 type Props = NativeStackScreenProps<HomeStackParamList, 'HomeMain'>;
@@ -82,6 +95,48 @@ type Props = NativeStackScreenProps<HomeStackParamList, 'HomeMain'>;
 export default function HomeScreen({ navigation }: Props) {
   const theme = useTheme();
   const styles = makeStyles(theme);
+
+  const [activeTab, setActiveTab] = useState<'tv' | 'movie'>('tv');
+  const tabScrollRef = useRef<ScrollView>(null);
+  // Screen (see components/Screen.tsx) applies its own horizontal margin, so
+  // the pager's usable width is that inner content box, not the raw window
+  // width — measured via onLayout on the pager's own container rather than
+  // assumed from useWindowDimensions (which would overflow past the margin).
+  const [pagerWidth, setPagerWidth] = useState(0);
+  // Guards against onMomentumScrollEnd re-deriving activeTab from a
+  // programmatic scrollTo (tab tap) — only swipe-driven settles should do
+  // that; a tap already sets activeTab directly.
+  const isProgrammaticScroll = useRef(false);
+
+  const handleTabPress = useCallback(
+    (key: 'tv' | 'movie') => {
+      // A tap can land before the pager's onLayout has measured pagerWidth
+      // (e.g. first paint on a slow device) — still switch the active tab so
+      // the tap isn't silently swallowed, just skip the scrollTo (there's
+      // nothing to scroll to yet).
+      if (pagerWidth) {
+        const index = MEDIA_TABS.findIndex((t) => t.key === key);
+        isProgrammaticScroll.current = true;
+        tabScrollRef.current?.scrollTo({ x: index * pagerWidth, animated: true });
+      }
+      setActiveTab(key);
+    },
+    [pagerWidth],
+  );
+
+  const handleTabScrollEnd = useCallback(
+    (e: NativeSyntheticEvent<NativeScrollEvent>) => {
+      if (isProgrammaticScroll.current) {
+        isProgrammaticScroll.current = false;
+        return;
+      }
+      if (!pagerWidth) return;
+      const index = Math.round(e.nativeEvent.contentOffset.x / pagerWidth);
+      const tab = MEDIA_TABS[index];
+      if (tab) setActiveTab(tab.key);
+    },
+    [pagerWidth],
+  );
 
   const [trackedPhase, setTrackedPhase] = useState<Phase>('loading');
   const [trackedItems, setTrackedItems] = useState<UpNextItem[]>([]);
@@ -101,6 +156,9 @@ export default function HomeScreen({ navigation }: Props) {
   const watchedPendingKeysRef = useRef<Set<string>>(new Set());
   const [confirmation, setConfirmation] = useState<string | null>(null);
   const confirmationTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Post-watch rating prompt (Story 3.5) — mounted once at the screen level,
+  // opened with the id logWatch returns. Non-null id ⇒ visible.
+  const [promptWatchId, setPromptWatchId] = useState<string | null>(null);
 
   // Guards against setState after unmount from an in-flight fetch (mirrors
   // TitleDetailScreen.load's mountedRef pattern). Shared by both shelves.
@@ -173,7 +231,16 @@ export default function HomeScreen({ navigation }: Props) {
         if (!trackedHasLoadedRef.current) setTrackedPhase('error');
         return;
       }
-      setTrackedItems(resolved);
+      // Films have no untrack (see trackedShows.ts) so a watched film stays in
+      // `tracked_shows` forever — filter it out of Up Next here rather than at
+      // the source. TV shows are unaffected: their own watched/caught-up state
+      // is already expressed through `nextEpisodePointer`, not this check.
+      const loggedKeys = await getLoggedKeys(resolved);
+      if (!mountedRef.current || seq !== trackedRequestSeq.current) return; // superseded
+      const visible = resolved.filter(
+        (item) => item.mediaType !== 'movie' || !loggedKeys.has(watchKey(item.tmdbId, item.mediaType)),
+      );
+      setTrackedItems(visible);
       trackedHasLoadedRef.current = true;
       setTrackedPhase('loaded');
     } catch (err) {
@@ -276,13 +343,19 @@ export default function HomeScreen({ navigation }: Props) {
       watchedPendingKeysRef.current.add(key);
       setWatchedPendingKeys((prev) => new Set(prev).add(key));
       try {
-        await logWatch({
+        const watchId = await logWatch({
           tmdbId: item.tmdbId,
           mediaType: item.mediaType,
           tmdbEpisodeId: item.mediaType === 'tv' ? (upNextItem.nextEpisodePointer ?? null) : null,
         });
         if (!mountedRef.current) return;
+        // Confirm and open the rating prompt the moment the LOCAL commit lands
+        // — before triggerSync and the two refetches below (Story 3.5, AC1:
+        // "when the commit lands"). Leaving the prompt behind those awaits would
+        // put a network round-trip in front of it and blow NFR1's 15s budget on
+        // a slow connection; the refetches still run in the background.
         showConfirmation(COPY_WATCHED);
+        setPromptWatchId(watchId);
         await triggerSync().catch((err) => {
           console.warn('mark watched: background sync failed', err);
         });
@@ -306,6 +379,28 @@ export default function HomeScreen({ navigation }: Props) {
     [showConfirmation, loadTracked, loadWatchlist],
   );
 
+  const trackedByTab = useMemo(
+    () => ({
+      tv: trackedItems.filter((item) => item.mediaType === 'tv'),
+      movie: trackedItems.filter((item) => item.mediaType === 'movie'),
+    }),
+    [trackedItems],
+  );
+  const watchlistByTab = useMemo(
+    () => ({
+      tv: watchlistItems.filter((item) => item.mediaType === 'tv'),
+      movie: watchlistItems.filter((item) => item.mediaType === 'movie'),
+    }),
+    [watchlistItems],
+  );
+  const watchedWatchlistByTab = useMemo(
+    () => ({
+      tv: watchedWatchlistItems.filter((item) => item.mediaType === 'tv'),
+      movie: watchedWatchlistItems.filter((item) => item.mediaType === 'movie'),
+    }),
+    [watchedWatchlistItems],
+  );
+
   // Whole-page empty reconciliation (Story 3.1, see file header): collapse to
   // the single whole-page copy only once BOTH shelves are loaded AND empty.
   // Either shelf still loading/erroring means "not yet decided" — keep
@@ -327,58 +422,97 @@ export default function HomeScreen({ navigation }: Props) {
 
   return (
     <Screen>
+      <View style={styles.tabBar} accessibilityRole="tablist">
+        {MEDIA_TABS.map((tab) => {
+          const isActive = tab.key === activeTab;
+          return (
+            <Pressable
+              key={tab.key}
+              onPress={() => handleTabPress(tab.key)}
+              style={styles.tabButton}
+              accessibilityRole="tab"
+              accessibilityState={{ selected: isActive }}
+              accessibilityLabel={tab.label}
+            >
+              <Text style={[styles.tabLabel, isActive && styles.tabLabelActive]}>{tab.label}</Text>
+              <View style={[styles.tabIndicator, isActive && styles.tabIndicatorActive]} />
+            </Pressable>
+          );
+        })}
+      </View>
+
+      {confirmation && (
+        <Text style={styles.confirmation} accessibilityLiveRegion="polite">
+          {confirmation}
+        </Text>
+      )}
+
       <ScrollView
-        style={styles.pageScroll}
-        contentContainerStyle={styles.pageScrollContent}
-        showsVerticalScrollIndicator={false}
+        ref={tabScrollRef}
+        horizontal
+        pagingEnabled
+        showsHorizontalScrollIndicator={false}
+        onMomentumScrollEnd={handleTabScrollEnd}
+        onLayout={(e) => setPagerWidth(e.nativeEvent.layout.width)}
+        style={styles.tabPager}
       >
-        {confirmation && (
-          <Text style={styles.confirmation} accessibilityLiveRegion="polite">
-            {confirmation}
-          </Text>
-        )}
-        <Shelf
-          heading="Up Next"
-          phase={trackedPhase}
-          items={trackedItems}
-          emptyCopy={COPY_UP_NEXT_EMPTY}
-          horizontal={false}
-          onRetry={loadTracked}
-          onOpenDetail={handleOpenDetail}
-          onMarkWatched={handleMarkWatched}
-          watchedPendingKeys={watchedPendingKeys}
-          theme={theme}
-          styles={styles}
-        />
-        <Shelf
-          heading="Watchlist"
-          phase={watchlistPhase}
-          items={watchlistItems}
-          emptyCopy={COPY_WATCHLIST_EMPTY}
-          horizontal={false}
-          onRetry={loadWatchlist}
-          onOpenDetail={handleOpenDetail}
-          theme={theme}
-          styles={styles}
-        />
-        {watchedWatchlistItems.length > 0 && (
-          <Shelf
-            heading="Watched"
-            phase={watchlistPhase}
-            items={watchedWatchlistItems}
-            collapsedCopy="Tap to see what's already watched."
-            accordion
-            defaultExpanded={false}
-            horizontal={false}
-            onRetry={loadWatchlist}
-            onOpenDetail={handleOpenDetail}
-            onMarkWatched={handleMarkWatched}
-            watchedPendingKeys={watchedPendingKeys}
-            theme={theme}
-            styles={styles}
-          />
-        )}
+        {MEDIA_TABS.map((tab) => (
+          <ScrollView
+            key={tab.key}
+            style={[styles.pageScroll, pagerWidth ? { width: pagerWidth } : null]}
+            contentContainerStyle={styles.pageScrollContent}
+            showsVerticalScrollIndicator={false}
+          >
+            <Shelf
+              heading="Up Next"
+              phase={trackedPhase}
+              items={trackedByTab[tab.key]}
+              emptyCopy={COPY_UP_NEXT_EMPTY}
+              horizontal={false}
+              onRetry={loadTracked}
+              onOpenDetail={handleOpenDetail}
+              onMarkWatched={handleMarkWatched}
+              watchedPendingKeys={watchedPendingKeys}
+              theme={theme}
+              styles={styles}
+            />
+            <Shelf
+              heading="Watchlist"
+              phase={watchlistPhase}
+              items={watchlistByTab[tab.key]}
+              emptyCopy={COPY_WATCHLIST_EMPTY}
+              horizontal={false}
+              onRetry={loadWatchlist}
+              onOpenDetail={handleOpenDetail}
+              theme={theme}
+              styles={styles}
+            />
+            {watchedWatchlistByTab[tab.key].length > 0 && (
+              <Shelf
+                heading="Watched"
+                phase={watchlistPhase}
+                items={watchedWatchlistByTab[tab.key]}
+                collapsedCopy="Tap to see what's already watched."
+                accordion
+                defaultExpanded={false}
+                horizontal={false}
+                onRetry={loadWatchlist}
+                onOpenDetail={handleOpenDetail}
+                onMarkWatched={handleMarkWatched}
+                watchedPendingKeys={watchedPendingKeys}
+                watchedIcon
+                theme={theme}
+                styles={styles}
+              />
+            )}
+          </ScrollView>
+        ))}
       </ScrollView>
+      <RatingPrompt
+        watchId={promptWatchId}
+        visible={promptWatchId != null}
+        onDismiss={() => setPromptWatchId(null)}
+      />
     </Screen>
   );
 }
@@ -398,6 +532,7 @@ function Shelf({
   onOpenDetail,
   onMarkWatched,
   watchedPendingKeys,
+  watchedIcon = false,
   theme,
   styles,
 }: {
@@ -419,6 +554,9 @@ function Shelf({
   // wall — that shelf's items haven't been watched yet).
   onMarkWatched?: (item: CatalogResult) => void;
   watchedPendingKeys?: Set<string>;
+  // Watched shelf only: swap the "Watched" text pill for a round green tick
+  // (the item is already known-watched, so the label is redundant).
+  watchedIcon?: boolean;
   theme: Theme;
   styles: ReturnType<typeof makeStyles>;
 }) {
@@ -507,6 +645,7 @@ function Shelf({
                   onPress={onOpenDetail}
                   onMarkWatched={showWatchedPill ? onMarkWatched : undefined}
                   watchedPending={watchedPendingKeys?.has(key) ?? false}
+                  watchedIcon={watchedIcon}
                 />
               </View>
             );
@@ -528,6 +667,35 @@ function makeStyles(theme: Theme) {
       color: colors.inkSecondary,
       marginBottom: spacing.sm,
     },
+    tabBar: {
+      flexDirection: 'row',
+      borderBottomWidth: StyleSheet.hairlineWidth,
+      borderBottomColor: colors.borderHairline,
+    },
+    tabButton: {
+      flex: 1,
+      alignItems: 'center',
+      paddingTop: spacing.sm,
+      paddingBottom: spacing.sm,
+      gap: spacing.xs,
+    },
+    tabLabel: {
+      ...type.label,
+      color: colors.inkSecondary,
+    },
+    tabLabelActive: {
+      color: colors.inkPrimary,
+    },
+    tabIndicator: {
+      height: 2,
+      width: '60%',
+      borderRadius: 1,
+      backgroundColor: 'transparent',
+    },
+    tabIndicatorActive: {
+      backgroundColor: colors.primary,
+    },
+    tabPager: { flex: 1 },
     pageScroll: { flex: 1 },
     pageScrollContent: { flexGrow: 1 },
     shelfSection: { marginBottom: spacing.lg },

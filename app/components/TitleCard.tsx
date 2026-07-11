@@ -107,6 +107,7 @@ export function TitleCard({
   watchlisted = false,
   onMarkWatched,
   watchedPending = false,
+  watchedIcon = false,
 }: {
   item: CatalogResult;
   onPress?: (item: CatalogResult) => void;
@@ -116,6 +117,10 @@ export function TitleCard({
   watchlisted?: boolean;
   onMarkWatched?: (item: CatalogResult) => void;
   watchedPending?: boolean;
+  // Watched shelf (HomeScreen): swap the text pill for a round green tick —
+  // the item is already known-watched there, so "Watched" as a label is
+  // redundant; tapping still logs a rewatch via onMarkWatched (AD-3).
+  watchedIcon?: boolean;
 }) {
   const theme = useTheme();
   const styles = makeStyles(theme);
@@ -194,7 +199,22 @@ export function TitleCard({
           pointer is non-null (Story 3.3 widened this from tv-only), and (as
           of this story's review) the Watchlist's own "Watched" shelf too, so
           a rewatch can be logged from there (AD-3). */}
-      {onMarkWatched && (
+      {onMarkWatched && watchedIcon && (
+        <Pressable
+          onPress={() => onMarkWatched(item)}
+          disabled={watchedPending}
+          style={({ pressed }) => [styles.iconButton, pressed && styles.iconButtonPressed]}
+          hitSlop={8}
+          accessibilityRole="button"
+          accessibilityState={{ disabled: watchedPending }}
+          accessibilityLabel={
+            watchedPending ? `${item.title} marked watched` : `Log another watch of ${item.title}`
+          }
+        >
+          <Ionicons name="checkmark-circle" size={28} color={theme.colors.success} />
+        </Pressable>
+      )}
+      {onMarkWatched && !watchedIcon && (
         <Pressable
           onPress={() => onMarkWatched(item)}
           disabled={watchedPending}

@@ -9,27 +9,27 @@
 // (transparent + slide animation), no new dependency.
 //
 // Season-level rating/mood (AC3) is a SEPARATE, minimal, self-contained
-// control — NOT Story 3.5's post-watch prompt (still backlog, a 0–2
-// multi-select mood sheet that slides up after a single watch). This is one
-// optional 0–5 half-star rating and at most one optional mood chip, applied
-// identically to every episode this bulk action logs. Read the story's scope
-// wall before touching this file: no shared StarRating/MoodChip extraction,
-// no multi-mood selector, no "already watched" indicator on the episode list.
+// control — NOT Story 3.5's post-watch prompt (a 0–2 multi-select mood sheet
+// that slides up after a *single* watch). This is one optional 0–5 half-star
+// rating and at most one optional mood chip, applied identically to every
+// episode this bulk action logs; the bulk path fires no post-watch prompt.
+//
+// The shared StarRating/MoodChipRow extraction this file's 3.4 header deferred
+// to 3.5 has now happened — this file consumes both (a `max={1}` MoodChipRow is
+// exactly 3.4's single-select radio), with identical behavior. No multi-mood
+// selector here; the 0–2 selection is the post-watch prompt's, not the sheet's.
 
 import { useEffect, useRef, useState } from 'react';
 import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { Ionicons } from '@expo/vector-icons';
 
+import MoodChipRow from '../../components/MoodChipRow';
+import StarRating from '../../components/StarRating';
 import { logWatchBatch } from '../../data/watchLog';
-import { MOODS } from '../../data/moods';
 import type { SeasonDetail } from '../../data/catalog';
 import { useTheme } from '../../theme/ThemeProvider';
 import type { Theme } from '../../theme/tokens';
-
-// 5 stars, half-step, mapped onto `watches.rating`'s existing 0–10 smallint
-// scale (0003_watches.sql) — no schema change needed for rating.
-const STAR_COUNT = 5;
 
 const COPY_SAVE_FAILED = "Couldn't save that — try again.";
 
@@ -100,20 +100,6 @@ export default function BulkLogSheet({
     });
   };
 
-  // Radio behavior: selecting a new star value replaces the old one;
-  // tapping the already-selected value deselects (null = unset, representable).
-  const handleStarPress = (value: number) => {
-    if (saving) return;
-    setRating((prev) => (prev === value ? null : value));
-  };
-
-  // Radio behavior: selecting a new chip deselects the previous one; tapping
-  // the already-selected chip deselects it (0 or 1 selected, never more).
-  const toggleMood = (emoji: string) => {
-    if (saving) return;
-    setMood((prev) => (prev === emoji ? null : emoji));
-  };
-
   // Dismissing (backdrop tap or close) must never log anything — a no-op
   // while a confirm is already in flight avoids closing out from under it.
   const handleDismiss = () => {
@@ -139,7 +125,9 @@ export default function BulkLogSheet({
           mediaType,
           tmdbEpisodeId: ep.tmdbEpisodeId,
           rating,
-          mood,
+          // LogWatchInput is now a 0–2 array (Story 3.5); this sheet still
+          // collects at most one mood, so wrap it (or [] for none).
+          moods: mood ? [mood] : null,
         })),
       );
       onLogged();
@@ -200,63 +188,15 @@ export default function BulkLogSheet({
             })}
 
             <Text style={styles.sectionLabel}>Rate the season (optional)</Text>
-            <View style={styles.starRow}>
-              {Array.from({ length: STAR_COUNT }, (_, i) => {
-                const halfValue = i * 2 + 1;
-                const fullValue = i * 2 + 2;
-                const current = rating ?? 0;
-                const filled = current >= fullValue;
-                const half = !filled && current >= halfValue;
-                const iconName = half ? 'star-half' : 'star';
-                return (
-                  <View key={i} style={styles.starTarget}>
-                    <Pressable
-                      onPress={() => handleStarPress(halfValue)}
-                      disabled={saving}
-                      style={styles.starHalfTap}
-                      accessibilityRole="button"
-                      accessibilityLabel={`Rate ${i + 0.5} stars`}
-                      accessibilityState={{ selected: half, disabled: saving }}
-                    />
-                    <Pressable
-                      onPress={() => handleStarPress(fullValue)}
-                      disabled={saving}
-                      style={styles.starHalfTap}
-                      accessibilityRole="button"
-                      accessibilityLabel={`Rate ${i + 1} stars`}
-                      accessibilityState={{ selected: filled, disabled: saving }}
-                    />
-                    <Ionicons
-                      name={iconName}
-                      size={28}
-                      color={theme.colors.gold}
-                      style={[styles.starIcon, !filled && !half && styles.starEmpty]}
-                      pointerEvents="none"
-                    />
-                  </View>
-                );
-              })}
-            </View>
+            <StarRating value={rating} onChange={setRating} disabled={saving} />
 
             <Text style={styles.sectionLabel}>Mood (optional)</Text>
-            <View style={styles.moodRow}>
-              {MOODS.map(({ emoji, name }) => {
-                const selectedMood = mood === emoji;
-                return (
-                  <Pressable
-                    key={emoji}
-                    onPress={() => toggleMood(emoji)}
-                    disabled={saving}
-                    style={[styles.moodChip, selectedMood && styles.moodChipSelected]}
-                    accessibilityRole="button"
-                    accessibilityState={{ selected: selectedMood, disabled: saving }}
-                    accessibilityLabel={name}
-                  >
-                    <Text style={styles.moodEmoji}>{emoji}</Text>
-                  </Pressable>
-                );
-              })}
-            </View>
+            <MoodChipRow
+              value={mood ? [mood] : []}
+              onChange={(v) => setMood(v[0] ?? null)}
+              max={1}
+              disabled={saving}
+            />
 
             {error && (
               <Text style={styles.errorText} accessibilityLiveRegion="polite">
@@ -305,24 +245,6 @@ function makeStyles(theme: Theme) {
     episodeNumber: { ...type.label, color: colors.inkSecondary, minWidth: 20, textAlign: 'right' },
     episodeName: { ...type.body, color: colors.inkPrimary, flex: 1 },
     sectionLabel: { ...type.label, color: colors.inkSecondary, marginTop: spacing.md },
-    starRow: { flexDirection: 'row', gap: spacing.xs },
-    starTarget: { width: 28, height: 44, flexDirection: 'row', justifyContent: 'center', alignItems: 'center' },
-    starHalfTap: { width: 14, height: 44 },
-    starIcon: { position: 'absolute', left: 0, top: 8 },
-    // DESIGN.md#Components: empty portion of the star at 28% opacity.
-    starEmpty: { opacity: 0.28 },
-    moodRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
-    moodChip: {
-      minHeight: 44,
-      minWidth: 44,
-      paddingHorizontal: spacing.md,
-      borderRadius: radius.pill,
-      alignItems: 'center',
-      justifyContent: 'center',
-      backgroundColor: colors.surfaceBase,
-    },
-    moodChipSelected: { backgroundColor: colors.surfaceSunken },
-    moodEmoji: { fontSize: 20 },
     errorText: { ...type.meta, color: colors.primary, marginTop: spacing.sm },
     confirmButton: {
       backgroundColor: colors.primary,

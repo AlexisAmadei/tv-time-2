@@ -37,6 +37,8 @@ export interface ColorPalette {
   cool: string;
   /** Memory/identity color — rating stars + notify/caught-up only. Never nav/buttons/decoration. */
   gold: string;
+  /** Functional success state (DESIGN.md:99) — used sparingly, never for brand/decoration. */
+  success: string;
 }
 
 /** Dark — VHS Dusk. The default and the only wired mode this story. */
@@ -51,6 +53,7 @@ export const darkColors: ColorPalette = {
   primaryPress: '#D43F7B',
   cool: '#45C2CF',
   gold: '#F2C14E',
+  success: '#4CAF6D',
 };
 
 /** Light — Paper White. Defined-but-dormant; wired in Story 4.3 (FR45). */
@@ -65,6 +68,7 @@ export const lightColors: ColorPalette = {
   primaryPress: '#C24F3B',
   cool: '#2F8F88',
   gold: '#DCA82E',
+  success: '#3D8B5F',
 };
 
 /**
