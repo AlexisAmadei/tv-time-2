@@ -443,16 +443,20 @@ function SeasonRow({
           </View>
         ))}
       {/* Separate control from the header Pressable above — expand/collapse is
-          unrelated, unchanged 2.2 behavior (Story 3.4, AC1). */}
-      <Pressable
-        onPress={() => onMarkSeasonWatched(season)}
-        style={styles.markSeasonButton}
-        accessibilityRole="button"
-        accessibilityLabel={`Mark all of ${season.name} watched`}
-      >
-        <Ionicons name="checkmark-done-outline" size={20} color={theme.colors.primary} />
-        <Text style={styles.markSeasonText}>Mark whole season watched</Text>
-      </Pressable>
+          unrelated, unchanged 2.2 behavior (Story 3.4, AC1). Hidden for a
+          season with no episodes (empty payload) — the bulk sheet would open
+          to an empty list with a permanently-disabled Confirm, a dead-end. */}
+      {count > 0 && (
+        <Pressable
+          onPress={() => onMarkSeasonWatched(season)}
+          style={styles.markSeasonButton}
+          accessibilityRole="button"
+          accessibilityLabel={`Mark all of ${season.name} watched`}
+        >
+          <Ionicons name="checkmark-done-outline" size={20} color={theme.colors.primary} />
+          <Text style={styles.markSeasonText}>Mark whole season watched</Text>
+        </Pressable>
+      )}
     </View>
   );
 }

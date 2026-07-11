@@ -4,7 +4,7 @@ baseline_commit: fa0332b1a74e83e216dccd459a61f2eb3b4df62d
 
 # Story 3.4: Bulk-log a whole season
 
-Status: review
+Status: done
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -78,6 +78,19 @@ This story is TV-only (films have no seasons — `TitleDetailScreen.tsx` already
     - The confirmation copy shows verbatim on a successful bulk log (AC4).
     - Network disabled: confirm the bulk sheet's commits still land locally instantly (each `logWatch()` call resolves synchronously against the local outbox per AD-4) even though the RPC/pointer recompute only completes once connectivity returns and sync drains — mirrors 3.2/3.3's own network-off checks.
     - A season bulk-logged for an **untracked** title (no "I'm watching this" ever tapped) still creates the `watches` rows correctly, and the pointer RPC no-ops harmlessly (verifies the "Step 1: not tracked → nothing to do" branch in `0007_recompute_next_episode_pointer.sql`, unchanged by this story).
+
+## Review Findings
+
+_Code review 2026-07-11 — 3-layer adversarial (Blind Hunter · Edge Case Hunter · Acceptance Auditor). Target: commit `5af6b75` (`5af6b75^..5af6b75`). Note: parts of this commit's code (`BulkLogSheet` inline star/mood, `watchLog.ts`, `watchSync.ts`) have since been rewritten by Story 3.5 in the working tree — findings against superseded code are noted as such._
+
+### Decision needed
+
+- [x] [Review][Decision] `logWatchBatch()` uses an all-or-nothing transaction, reversing the spec's documented per-episode "no distributed rollback" posture — Task 4 prescribed a sequential `for...of` + `await logWatch()` where each episode is its own atomic commit and a partial failure leaves already-committed episodes in place. The implementation instead added a new exported `logWatchBatch()` wrapping all inserts in one `db.withTransactionAsync(...)` with a single `triggerSync()`. AC2 still holds (one `watches` row per selected episode). **RESOLVED: KEEP** — the batch transaction is an accepted improvement; it removes a latent double-log-on-retry hazard the spec's own per-episode approach carries (partial commit → retry re-logs the committed episodes, no dedup). [app/data/watchLog.ts]
+
+### Patches
+
+- [x] [Review][Patch] Migration `0008` splits `ADD CONSTRAINT ... NOT VALID` from `VALIDATE CONSTRAINT` inside a single `do $$` block, and the header claims this "isolates the failure" — but a DO block is one transaction, so a VALIDATE failure rolls back the ADD too and still aborts the folder re-apply. The split buys nothing; collapse to a plain `add constraint ... check(...)` (still inside the existence guard) and correct the misleading header comment. **FIXED** — collapsed to a single `add constraint ... check(...)`, header rewritten. [supabase/migrations/0008_watches_mood_check.sql]
+- [x] [Review][Patch] Zero-episode season opens a dead-end bulk-log sheet — `SeasonRow` renders "Mark whole season watched" unconditionally; a season whose payload has no episodes opens a sheet with an empty list and a permanently-disabled Confirm, a dead-end. **FIXED** — entry button now gated on `count > 0`. [app/features/title-detail/TitleDetailScreen.tsx — SeasonRow]
 
 ## Dev Notes
 

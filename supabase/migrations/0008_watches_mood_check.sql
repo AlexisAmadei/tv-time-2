@@ -20,17 +20,9 @@
 -- (its own mood concept is a 0–2 multi-select).
 --
 -- Postgres has no native `ADD CONSTRAINT IF NOT EXISTS`, so guard the ALTER
--- with an explicit existence check against `pg_constraint`.
---
--- Added `NOT VALID` + a separate `VALIDATE CONSTRAINT`, rather than one plain
--- `ADD CONSTRAINT ... CHECK (...)`: this migration folder has no
--- migration-tracking table, so `pnpm run supabase:migrate` re-applies every
--- file, every run (see every migration's own header). A single combined
--- statement that failed on some pre-existing out-of-set row would abort the
--- whole re-apply and permanently block every migration after this one; two
--- statements at least get the constraint (and the failure, if any) isolated
--- to this file, and enforce it against new writes immediately regardless of
--- whether the legacy-data scan behind them succeeds.
+-- with an explicit existence check against `pg_constraint`. `mood` has only
+-- ever been written null (this is the first story to write it — Task 1a/1b),
+-- so there are no legacy rows for the implicit validation scan to trip on.
 do $$
 begin
   if not exists (
@@ -38,8 +30,6 @@ begin
   ) then
     alter table public.watches
       add constraint watches_mood_check
-      check (mood is null or mood <@ array['😭','😂','😱','🥰','🤯','😴','😬','🔥']::text[])
-      not valid;
-    alter table public.watches validate constraint watches_mood_check;
+      check (mood is null or mood <@ array['😭','😂','😱','🥰','🤯','😴','😬','🔥']::text[]);
   end if;
 end $$;
