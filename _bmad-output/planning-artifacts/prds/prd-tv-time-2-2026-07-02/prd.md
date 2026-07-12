@@ -1,15 +1,15 @@
 ---
-title: "PRD: TV Time 2 (working name)"
+title: "PRD: Popcorn Time (working name)"
 status: final
 created: 2026-07-02
 updated: 2026-07-02
 ---
 
-# PRD: TV Time 2 (working name)
+# PRD: Popcorn Time (working name)
 
 ## Overview
 
-TV Time — the app millions used to track shows and films and remember how they felt about them — deletes **all** user viewing history on **July 15, 2026**. TV Time 2 is its open-source, community-driven successor: a fast, honest **personal watch-memory** first, and a **light social network** second.
+TV Time — the app millions used to track shows and films and remember how they felt about them — deletes **all** user viewing history on **July 15, 2026**. Popcorn Time is its open-source, community-driven successor: a fast, honest **personal watch-memory** first, and a **light social network** second.
 
 You log what you watch, rate it and react in a tap, and over time build a private, timestamped timeline of your viewing life — *what* you watched, *when*, and *how it felt then*. Because it's multi-user, you can also follow friends, see their reactions, and share lists — the human part of TV Time that a solo journaling app never replaces.
 
@@ -31,7 +31,7 @@ This is a **passion project, not a business**: no monetization, ever. It ships t
 4. Provide a small, honest, non-algorithmic social layer among real friends.
 5. Be genuinely open — installable from stores **and** F-Droid, inspectable, forkable.
 
-**On durability — an honest scope note.** TV Time 2 runs as a **single centrally-hosted instance** by a solo maintainer with no revenue. That is the same structural single-point-of-failure that killed TV Time, and this PRD will not pretend otherwise. What v1 *does* guarantee: (a) every user can export their full data at any time (FR4), and (b) a committed **wind-down pledge** — if the instance is ever shut down, all users get a final export and reasonable notice (NFR11). The promise is therefore *"your history is yours and portable,"* **not** *"the service will outlive its maintainer."* Community-run instances / federation are a post-v1 survivability path, not a v1 commitment.
+**On durability — an honest scope note.** Popcorn Time runs as a **single centrally-hosted instance** by a solo maintainer with no revenue. That is the same structural single-point-of-failure that killed TV Time, and this PRD will not pretend otherwise. What v1 *does* guarantee: (a) every user can export their full data at any time (FR4), and (b) a committed **wind-down pledge** — if the instance is ever shut down, all users get a final export and reasonable notice (NFR11). The promise is therefore *"your history is yours and portable,"* **not** *"the service will outlive its maintainer."* Community-run instances / federation are a post-v1 survivability path, not a v1 commitment.
 
 **Success criteria**
 - The creator uses it **daily and enjoys it** — logging is a small pleasure, not a chore — and never defects to Letterboxd or a spreadsheet for this purpose. Delight is a first-class measure here, not just retention.
@@ -190,7 +190,7 @@ FRs are grouped by capability with globally stable IDs. See the **Glossary** for
 
 ## Vision (post-v1)
 
-If it works, TV Time 2 becomes the **durable, open home for watch-memories**. **v2 flagship: LLM-powered recommendations** that read your own history and **mood/rating sentiment** to suggest what to watch next, mood-aware. **Web** (at least a read-only companion) and a **survivability path** (community-run instances / federation) are the other leading post-v1 threads. Longer term: a small, healthy, non-commercial community of watchers sharing honest, in-the-moment reactions — the good part of TV Time, kept alive by the people who loved it.
+If it works, Popcorn Time becomes the **durable, open home for watch-memories**. **v2 flagship: LLM-powered recommendations** that read your own history and **mood/rating sentiment** to suggest what to watch next, mood-aware. **Web** (at least a read-only companion) and a **survivability path** (community-run instances / federation) are the other leading post-v1 threads. Longer term: a small, healthy, non-commercial community of watchers sharing honest, in-the-moment reactions — the good part of TV Time, kept alive by the people who loved it.
 
 ## Glossary
 

@@ -130,7 +130,7 @@ export default function AuthScreen() {
   return (
     <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
-        <Text style={styles.title}>TV Time 2</Text>
+        <Text style={styles.title}>Popcorn Time</Text>
 
         <View style={styles.tabs}>
           <ModeTab label="Sign in" active={mode === 'signin'} disabled={busy} onPress={() => switchMode('signin')} />

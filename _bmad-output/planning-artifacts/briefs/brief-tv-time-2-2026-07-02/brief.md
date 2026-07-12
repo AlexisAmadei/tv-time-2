@@ -1,16 +1,16 @@
 ---
-title: "Product Brief: TV Time 2 (working name)"
+title: "Product Brief: Popcorn Time (working name)"
 status: final
 created: 2026-07-02
 updated: 2026-07-02
 status_note: finalized after structure + prose editorial passes
 ---
 
-# Product Brief: TV Time 2 (working name)
+# Product Brief: Popcorn Time (working name)
 
 ## Executive Summary
 
-TV Time — a beloved app for tracking shows and films and remembering how you felt about them — shuts down on **July 15, 2026**, taking every user's viewing history with it. **TV Time 2** is an open-source, community-driven successor built for people who watch a lot and want to *remember* it: what they watched, when they watched it, and — crucially — **how they felt about it at the moment they watched it**, captured as a fast, expressive emoji reaction rather than a flattened star rating.
+TV Time — a beloved app for tracking shows and films and remembering how you felt about them — shuts down on **July 15, 2026**, taking every user's viewing history with it. **Popcorn Time** is an open-source, community-driven successor built for people who watch a lot and want to *remember* it: what they watched, when they watched it, and — crucially — **how they felt about it at the moment they watched it**, captured as a fast, expressive emoji reaction rather than a flattened star rating.
 
 It is a personal watch-memory first and a small social network second. You log what you watch, react in a tap, and over time build a private, honest timeline of your viewing life. Because it's multi-user and community-minded, you can also follow friends, see their reactions, and share lists — the part of TV Time that a solo journaling app like Letterboxd never quite replaces.
 
@@ -79,7 +79,7 @@ Honest caveat: the "moat" here is intent and openness, not technology. Anyone co
 
 ## Vision
 
-If it works, TV Time 2 becomes the **durable, open home for watch-memories**. Near-term (v2): **LLM-powered recommendations** that read your own history and emoji sentiment to suggest what to watch next, mood-aware. Longer term: a small, healthy, non-commercial community of watchers sharing honest, in-the-moment reactions — the good part of TV Time, kept alive by the people who loved it.
+If it works, Popcorn Time becomes the **durable, open home for watch-memories**. Near-term (v2): **LLM-powered recommendations** that read your own history and emoji sentiment to suggest what to watch next, mood-aware. Longer term: a small, healthy, non-commercial community of watchers sharing honest, in-the-moment reactions — the good part of TV Time, kept alive by the people who loved it.
 
 ## Open Questions
 

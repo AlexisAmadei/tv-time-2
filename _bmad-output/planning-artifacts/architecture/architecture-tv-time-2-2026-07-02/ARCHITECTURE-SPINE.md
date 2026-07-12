@@ -4,7 +4,7 @@ type: architecture-spine
 purpose: build-substrate
 altitude: feature           # keeps the epics/stories that follow this PRD coherent
 paradigm: 'BaaS-core with RLS-as-authorization'
-scope: 'TV Time 2 v1 — the full product: mobile client, self-hosted backend, data model, and the notification pipeline.'
+scope: 'Popcorn Time v1 — the full product: mobile client, self-hosted backend, data model, and the notification pipeline.'
 status: final
 created: '2026-07-02'
 updated: '2026-07-02'

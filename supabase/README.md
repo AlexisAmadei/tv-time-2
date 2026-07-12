@@ -1,6 +1,6 @@
 # Self-hosted Supabase stack (local dev)
 
-The local backend for TV Time 2: a pinned, self-hosted Supabase stack trimmed to
+The local backend for Popcorn Time: a pinned, self-hosted Supabase stack trimmed to
 the six services v1 needs.
 
 | Service     | Image                          | Role                          |

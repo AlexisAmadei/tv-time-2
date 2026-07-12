@@ -1,5 +1,5 @@
 ---
-title: "Sprint Change Proposal — TV Time 2"
+title: "Sprint Change Proposal — Popcorn Time"
 date: 2026-07-02
 author: Alex (via Correct Course workflow)
 status: approved
@@ -9,7 +9,7 @@ mode: incremental
 triggered_by: implementation-readiness-report-2026-07-02.md
 ---
 
-# Sprint Change Proposal — TV Time 2
+# Sprint Change Proposal — Popcorn Time
 
 **Date:** 2026-07-02 · **Project:** tv-time-2 · **Change mode:** Incremental
 

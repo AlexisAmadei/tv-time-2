@@ -1,4 +1,4 @@
-# PRD Quality Review — TV Time 2 (working name)
+# PRD Quality Review — Popcorn Time (working name)
 
 ## Overall verdict
 This is a genuinely good PRD: it has a real thesis ("logging is faster than forgetting," watch-memory first / social second), decisions are made rather than deferred, and the substance bar is met throughout — thresholds instead of adjectives, counter-metrics that name what it refuses to optimize, and rejected alternatives documented in the addendum. What's at risk is downstream mechanical hygiene: cross-references use descriptive names ("NFR-FDroid", "FR-Import", "FR-Diary/Profile") that don't resolve to the actual numeric IDs, there's no Glossary or Assumptions Index for a PRD explicitly built to feed UX/architecture/stories, and a handful of FRs still lean on soft adjectives. None of these threaten the PRD's core usefulness; they're friction for the workflows it feeds.

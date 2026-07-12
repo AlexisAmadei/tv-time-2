@@ -1,4 +1,4 @@
-# Adversarial Review — TV Time 2 PRD
+# Adversarial Review — Popcorn Time PRD
 
 Reviewer posture: cynical, adversarial, fair. Scope: `prd.md`, `addendum.md`, `brief.md`, `EXPERIENCE.md`.
 Date: 2026-07-02.

@@ -1,4 +1,4 @@
-# Addendum — TV Time 2
+# Addendum — Popcorn Time
 
 Depth captured during PRD discovery that belongs downstream (architecture / UX / build), not in the PRD narrative. The PRD states *what*; this holds *how* candidates, rejected alternatives, and rationale.
 

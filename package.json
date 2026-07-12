@@ -1,8 +1,8 @@
 {
   "name": "tv-time-2",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "private": true,
-  "description": "TV Time 2 — private-by-default film & TV tracker (Expo client + self-hosted Supabase).",
+  "description": "Popcorn Time — private-by-default film & TV tracker.",
   "packageManager": "pnpm@10.28.2",
   "engines": {
     "node": ">=20"

@@ -8,11 +8,11 @@ inputDocuments:
   - _bmad-output/planning-artifacts/ux-designs/ux-tv-time-2-2026-07-02/EXPERIENCE.md
 ---
 
-# TV Time 2 - Epic Breakdown
+# Popcorn Time - Epic Breakdown
 
 ## Overview
 
-This document provides the complete epic and story breakdown for TV Time 2, decomposing the requirements from the PRD, UX Design, and Architecture Spine into implementable stories.
+This document provides the complete epic and story breakdown for Popcorn Time, decomposing the requirements from the PRD, UX Design, and Architecture Spine into implementable stories.
 
 ## Requirements Inventory
 

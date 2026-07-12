@@ -1,4 +1,4 @@
-# Brief → PRD Reconciliation — TV Time 2
+# Brief → PRD Reconciliation — Popcorn Time
 
 **Date:** 2026-07-02
 **Source of truth:** `brief.md` (final)
