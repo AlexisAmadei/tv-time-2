@@ -13,6 +13,8 @@
     "supabase:keys": "node supabase/scripts/generate-keys.mjs",
     "supabase:migrate": "node supabase/scripts/apply-migrations.mjs",
     "app": "pnpm --filter popcorn-time start",
-    "verify": "node scripts/smoke-check.mjs"
+    "verify": "node scripts/smoke-check.mjs",
+    "build:android": "pnpm --dir app exec eas build --platform android --profile production",
+    "build:ios": "pnpm --dir app exec eas build --platform ios --profile production"
   }
 }
