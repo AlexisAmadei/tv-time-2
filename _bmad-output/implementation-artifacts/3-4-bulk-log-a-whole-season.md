@@ -143,14 +143,14 @@ Pattern holds: every feature commit is followed by a dedicated `fix:` commit onc
 ### References
 
 - [Source: _bmad-output/planning-artifacts/epics.md#Story 3.4: Bulk-log a whole season] — story statement + all four ACs (FR13, ARCH-9, UX-DR11, UX-DR20), plus the Epic 3 header's LOCKED mood-chip set and pointer-RPC contract note.
-- [Source: _bmad-output/planning-artifacts/architecture/architecture-tv-time-2-2026-07-02/ARCHITECTURE-SPINE.md#AD-10] — the single-writer, derive-from-full-watch-set pointer RPC contract this story's Task 1c fix must preserve.
-- [Source: _bmad-output/planning-artifacts/architecture/architecture-tv-time-2-2026-07-02/ARCHITECTURE-SPINE.md#AD-4] — the outbox contract (local write is the commit) `logWatch`/`watchSync` already implement, extended (not replaced) by Task 1.
-- [Source: _bmad-output/planning-artifacts/architecture/architecture-tv-time-2-2026-07-02/ARCHITECTURE-SPINE.md#Consistency Conventions] — "Moods: text[] constrained by a Postgres check constraint... never validated only in client code" — the exact rule Task 2's migration implements.
-- [Source: _bmad-output/planning-artifacts/ux-designs/ux-tv-time-2-2026-07-02/EXPERIENCE.md#Component Patterns] — "Bulk-log sheet: Season row on title detail — All episodes pre-checked; user deselects any, confirms once. Optional season-level rating."
-- [Source: _bmad-output/planning-artifacts/ux-designs/ux-tv-time-2-2026-07-02/EXPERIENCE.md#Key Flows, Flow 2] — the binge catch-up flow this story implements almost verbatim, including the exact AC4 confirmation copy.
-- [Source: _bmad-output/planning-artifacts/ux-designs/ux-tv-time-2-2026-07-02/EXPERIENCE.md#Accessibility Floor] — 44/48pt tap targets, "color is never the sole signal," mood chips/star rating announce their state.
-- [Source: _bmad-output/planning-artifacts/ux-designs/ux-tv-time-2-2026-07-02/DESIGN.md#Components] — star rating (5 stars, half-step, gold, empty portion 28% opacity) and mood chip (pill, single emoji, selected fills surface-sunken) specs this story's inline controls follow.
-- [Source: _bmad-output/planning-artifacts/ux-designs/ux-tv-time-2-2026-07-02/DESIGN.md#Shapes] — `rounded/lg` (18px) for bottom sheets and modal surfaces.
+- [Source: _bmad-output/planning-artifacts/architecture/architecture-popcorn-time-2026-07-02/ARCHITECTURE-SPINE.md#AD-10] — the single-writer, derive-from-full-watch-set pointer RPC contract this story's Task 1c fix must preserve.
+- [Source: _bmad-output/planning-artifacts/architecture/architecture-popcorn-time-2026-07-02/ARCHITECTURE-SPINE.md#AD-4] — the outbox contract (local write is the commit) `logWatch`/`watchSync` already implement, extended (not replaced) by Task 1.
+- [Source: _bmad-output/planning-artifacts/architecture/architecture-popcorn-time-2026-07-02/ARCHITECTURE-SPINE.md#Consistency Conventions] — "Moods: text[] constrained by a Postgres check constraint... never validated only in client code" — the exact rule Task 2's migration implements.
+- [Source: _bmad-output/planning-artifacts/ux-designs/ux-popcorn-time-2026-07-02/EXPERIENCE.md#Component Patterns] — "Bulk-log sheet: Season row on title detail — All episodes pre-checked; user deselects any, confirms once. Optional season-level rating."
+- [Source: _bmad-output/planning-artifacts/ux-designs/ux-popcorn-time-2026-07-02/EXPERIENCE.md#Key Flows, Flow 2] — the binge catch-up flow this story implements almost verbatim, including the exact AC4 confirmation copy.
+- [Source: _bmad-output/planning-artifacts/ux-designs/ux-popcorn-time-2026-07-02/EXPERIENCE.md#Accessibility Floor] — 44/48pt tap targets, "color is never the sole signal," mood chips/star rating announce their state.
+- [Source: _bmad-output/planning-artifacts/ux-designs/ux-popcorn-time-2026-07-02/DESIGN.md#Components] — star rating (5 stars, half-step, gold, empty portion 28% opacity) and mood chip (pill, single emoji, selected fills surface-sunken) specs this story's inline controls follow.
+- [Source: _bmad-output/planning-artifacts/ux-designs/ux-popcorn-time-2026-07-02/DESIGN.md#Shapes] — `rounded/lg` (18px) for bottom sheets and modal surfaces.
 - [Source: app/data/watchLog.ts] — `logWatch`/`LogWatchInput`, extended (not replaced) by Task 1a.
 - [Source: app/data/watchSync.ts] — the drain loop, the existing tv-only recompute gate, and the exact per-row inline-recompute code Task 1c relocates.
 - [Source: app/data/catalog.ts] — `SeasonDetail`/`EpisodeDetail`, already carrying everything the bulk sheet needs.

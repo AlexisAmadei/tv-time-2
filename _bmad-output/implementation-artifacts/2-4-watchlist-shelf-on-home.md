@@ -100,7 +100,7 @@ Reconciling those two (i.e., "show the big whole-page CTA only if the user *also
 The correct, minimal, in-scope move: this story replaces the placeholder with the real Watchlist shelf section (AC1/AC2 exactly as specified — the shelf's own empty copy, no whole-page fallback). Until 3.1 adds Up Next, the Watchlist shelf **is** the Home content — same as the 1.3 comment predicted ("arrive in Epics 2-3"). Do not attempt to preserve or gate the old CTA; do not try to guess the multi-shelf empty-state composition — that reconciliation is explicitly Story 3.1's job once Up Next exists to reconcile against.
 
 [Source: app/features/home/HomeScreen.tsx — the current 1.3 placeholder and its own "arrive in Epics 2-3" comment]
-[Source: _bmad-output/planning-artifacts/ux-designs/ux-tv-time-2-2026-07-02/EXPERIENCE.md — "Empty Home (new user)" vs "Empty Watchlist" as two distinct rows]
+[Source: _bmad-output/planning-artifacts/ux-designs/ux-popcorn-time-2026-07-02/EXPERIENCE.md — "Empty Home (new user)" vs "Empty Watchlist" as two distinct rows]
 [Source: _bmad-output/planning-artifacts/epics.md#Story 3.1 — Up Next shelf, tracked_shows, next_episode_pointer — the future story that will need to reconcile multi-shelf emptiness]
 
 ### Why the shelf reuses `fetchTitleDetail` instead of a new "batch lookup" endpoint
@@ -180,8 +180,8 @@ Pattern: each feature commit is followed by a dedicated `fix:`/patch commit once
 
 - [Source: _bmad-output/planning-artifacts/epics.md#Story 2.4: Watchlist shelf on Home] — story statement + all four ACs (FR26, UX-DR6, FR24, UX-DR14, UX-DR5)
 - [Source: _bmad-output/planning-artifacts/epics.md#Requirements Inventory] — FR26 (Watchlist surfaced on Home shelf + Profile), FR24 (warm empty states route to a first action — *no CTA specified for this one, per EXPERIENCE.md*), ARCH-6/ARCH-12 (catalog-title/catalog_cache proxy + TTL), ARCH-10 (identity-by-value, snake_case/camelCase)
-- [Source: _bmad-output/planning-artifacts/ux-designs/ux-tv-time-2-2026-07-02/EXPERIENCE.md] — "Empty Watchlist | Home shelf" row (the verbatim AC2 copy) vs. the separate "Empty Home (new user)" row (out of scope, reconciled once Up Next exists)
-- [Source: _bmad-output/planning-artifacts/ux-designs/ux-tv-time-2-2026-07-02/DESIGN.md#Components] — `title-card` definition ("Horizontal card — poster left...") confirming the shelf reuses the existing wide card, not a new poster-tile variant
+- [Source: _bmad-output/planning-artifacts/ux-designs/ux-popcorn-time-2026-07-02/EXPERIENCE.md] — "Empty Watchlist | Home shelf" row (the verbatim AC2 copy) vs. the separate "Empty Home (new user)" row (out of scope, reconciled once Up Next exists)
+- [Source: _bmad-output/planning-artifacts/ux-designs/ux-popcorn-time-2026-07-02/DESIGN.md#Components] — `title-card` definition ("Horizontal card — poster left...") confirming the shelf reuses the existing wide card, not a new poster-tile variant
 - [Source: app/features/home/HomeScreen.tsx] — the 1.3 placeholder being replaced, and its own forward-reference to this story
 - [Source: app/navigation/AddStack.tsx] — the native-stack pattern to mirror for `HomeStack.tsx`, and its own forward-reference to this story
 - [Source: app/features/title-detail/TitleDetailScreen.tsx] — the screen being made stack-agnostic; loading/loaded/error triad and heart wiring to leave untouched

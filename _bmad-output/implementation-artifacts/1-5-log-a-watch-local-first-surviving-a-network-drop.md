@@ -130,8 +130,8 @@ Additional behavior that must hold for the feature to work end-to-end in the exi
 - [Source: …/ARCHITECTURE-SPINE.md#AD-1] — RLS deny-by-default, owner-scoped policy formula
 - [Source: …/ARCHITECTURE-SPINE.md#AD-8] — cascade delete on `auth.users` FK
 - [Source: …/ARCHITECTURE-SPINE.md#Consistency Conventions] — `tmdb_id`/`media_type`/`tmdb_episode_id` binding, timestamp/rating/mood formats
-- [Source: _bmad-output/planning-artifacts/prds/prd-tv-time-2-2026-07-02/prd.md#FR12, FR14, FR15, NFR1, NFR8] — one-action film log, instant commit, timestamping, offline scope cap
-- [Source: _bmad-output/planning-artifacts/ux-designs/ux-tv-time-2-2026-07-02/EXPERIENCE.md#State Patterns] — "Watched confirmed" soft-confirmation copy (verbatim), Offline row
+- [Source: _bmad-output/planning-artifacts/prds/prd-popcorn-time-2026-07-02/prd.md#FR12, FR14, FR15, NFR1, NFR8] — one-action film log, instant commit, timestamping, offline scope cap
+- [Source: _bmad-output/planning-artifacts/ux-designs/ux-popcorn-time-2026-07-02/EXPERIENCE.md#State Patterns] — "Watched confirmed" soft-confirmation copy (verbatim), Offline row
 - [Source: _bmad-output/implementation-artifacts/1-4-search-a-real-title-through-the-proxied-catalog.md] — search module/screen this story extends, the duplicate-row/timeout lessons directly reused here
 - [Source: _bmad-output/implementation-artifacts/1-2-create-an-account-and-sign-in-google-free.md] — migration/grant-surgery pattern
 - [Source: supabase/migrations/0001_profiles.sql, 0002_catalog_cache.sql] — exact migration style to copy

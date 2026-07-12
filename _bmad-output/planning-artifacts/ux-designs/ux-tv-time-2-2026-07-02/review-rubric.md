@@ -1,4 +1,4 @@
-# Review — Rubric Coverage Lens (tv-time-2 UX)
+# Review — Rubric Coverage Lens (popcorn-time UX)
 
 Reviewed DESIGN.md and EXPERIENCE.md against required-section coverage, component cross-references, IA-surface reachability, flow climaxes, per-surface state handling, and dangling [ASSUMPTION] tags. Date: 2026-07-02.
 

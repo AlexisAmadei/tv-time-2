@@ -1,11 +1,11 @@
 ---
 title: Adversarial Divergence Review — ARCHITECTURE-SPINE.md
-target: architecture-tv-time-2-2026-07-02/ARCHITECTURE-SPINE.md
+target: architecture-popcorn-time-2026-07-02/ARCHITECTURE-SPINE.md
 method: construct two spine-compliant units one level down that still build incompatibly
 created: 2026-07-02
 ---
 
-# Adversarial Divergence Review — tv-time-2 Architecture Spine
+# Adversarial Divergence Review — popcorn-time Architecture Spine
 
 ## Verdict
 

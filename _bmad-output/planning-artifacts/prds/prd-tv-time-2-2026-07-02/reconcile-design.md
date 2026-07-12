@@ -1,7 +1,7 @@
 # DESIGN ↔ PRD Reconciliation
 
-**Source DESIGN:** `_bmad-output/planning-artifacts/ux-designs/ux-tv-time-2-2026-07-02/DESIGN.md`
-**Derived PRD:** `_bmad-output/planning-artifacts/prds/prd-tv-time-2-2026-07-02/prd.md`
+**Source DESIGN:** `_bmad-output/planning-artifacts/ux-designs/ux-popcorn-time-2026-07-02/DESIGN.md`
+**Derived PRD:** `_bmad-output/planning-artifacts/prds/prd-popcorn-time-2026-07-02/prd.md`
 **Date:** 2026-07-02
 **Scope of this pass:** DESIGN owns visual identity; PRD owns capabilities. Flag only (a) DESIGN detail that implies a *product requirement* the PRD should carry, or (b) genuine DESIGN↔PRD *contradictions*. Pure visual styling that correctly lives only in DESIGN is intentionally left alone.
 

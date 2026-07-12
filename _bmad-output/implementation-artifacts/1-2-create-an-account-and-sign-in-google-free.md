@@ -130,11 +130,11 @@ Don't over-engineer — add targeted assertions to the existing smoke script, no
 ### References
 
 - [Source: _bmad-output/planning-artifacts/epics.md#Story 1.2: Create an account and sign in (Google-free)] — story statement, ACs, epic framing
-- [Source: _bmad-output/planning-artifacts/architecture/architecture-tv-time-2-2026-07-02/ARCHITECTURE-SPINE.md#AD-1] — RLS-as-authorization, owner_id + deny-by-default
-- [Source: _bmad-output/planning-artifacts/architecture/architecture-tv-time-2-2026-07-02/ARCHITECTURE-SPINE.md#AD-8] — every FK to auth.users cascades (GDPR)
-- [Source: _bmad-output/planning-artifacts/architecture/architecture-tv-time-2-2026-07-02/ARCHITECTURE-SPINE.md#AD-12] — F-Droid Google-free auth by construction
-- [Source: _bmad-output/planning-artifacts/architecture/architecture-tv-time-2-2026-07-02/ARCHITECTURE-SPINE.md#Consistency Conventions] — snake_case/camelCase, uuid/timestamptz, error envelope
-- [Source: _bmad-output/planning-artifacts/prds/prd-tv-time-2-2026-07-02/prd.md#FR1-FR3, FR32] — account/sign-in, Google-free, exact-match @username; OQ#6 resolved (unique handle at sign-up)
+- [Source: _bmad-output/planning-artifacts/architecture/architecture-popcorn-time-2026-07-02/ARCHITECTURE-SPINE.md#AD-1] — RLS-as-authorization, owner_id + deny-by-default
+- [Source: _bmad-output/planning-artifacts/architecture/architecture-popcorn-time-2026-07-02/ARCHITECTURE-SPINE.md#AD-8] — every FK to auth.users cascades (GDPR)
+- [Source: _bmad-output/planning-artifacts/architecture/architecture-popcorn-time-2026-07-02/ARCHITECTURE-SPINE.md#AD-12] — F-Droid Google-free auth by construction
+- [Source: _bmad-output/planning-artifacts/architecture/architecture-popcorn-time-2026-07-02/ARCHITECTURE-SPINE.md#Consistency Conventions] — snake_case/camelCase, uuid/timestamptz, error envelope
+- [Source: _bmad-output/planning-artifacts/prds/prd-popcorn-time-2026-07-02/prd.md#FR1-FR3, FR32] — account/sign-in, Google-free, exact-match @username; OQ#6 resolved (unique handle at sign-up)
 - [Source: _bmad-output/implementation-artifacts/1-1-project-foundation-boots-locally.md] — substrate this story builds on (client, workspace, compose, env, shared-types); review-finding that GoTrue uses `msg` not `message`
 - [Web: https://supabase.com/docs/guides/auth/managing-user-data] — canonical `handle_new_user()` trigger + SECURITY DEFINER pattern (verify against current docs at implementation time)
 - [Web: https://supabase.com/docs/guides/local-development] / Inbucket — local mail-catcher pattern for magic-link/confirmation email (`supabase-mail`, SMTP 2500 / web 9000)

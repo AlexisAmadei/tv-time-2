@@ -1,6 +1,6 @@
 ---
 title: Good-Spine Checklist Review — ARCHITECTURE-SPINE.md
-target: architecture-tv-time-2-2026-07-02/ARCHITECTURE-SPINE.md
+target: architecture-popcorn-time-2026-07-02/ARCHITECTURE-SPINE.md
 method: score against the 8-point good-spine checklist (divergence coverage, Rule enforceability, Deferred safety, tech currency, terseness, structural-dimension coverage, diagram validity, capability-map coverage)
 created: 2026-07-02
 sibling-reviews:
@@ -8,7 +8,7 @@ sibling-reviews:
   - review-adversarial-divergence.md (Rule-enforceability deep dive via two-compliant-units construction)
 ---
 
-# Good-Spine Checklist Review — tv-time-2 Architecture Spine
+# Good-Spine Checklist Review — popcorn-time Architecture Spine
 
 ## Verdict
 

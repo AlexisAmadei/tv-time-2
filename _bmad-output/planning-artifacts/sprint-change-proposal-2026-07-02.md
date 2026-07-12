@@ -11,7 +11,7 @@ triggered_by: implementation-readiness-report-2026-07-02.md
 
 # Sprint Change Proposal — Popcorn Time
 
-**Date:** 2026-07-02 · **Project:** tv-time-2 · **Change mode:** Incremental
+**Date:** 2026-07-02 · **Project:** popcorn-time · **Change mode:** Incremental
 
 ## Section 1 — Issue Summary
 

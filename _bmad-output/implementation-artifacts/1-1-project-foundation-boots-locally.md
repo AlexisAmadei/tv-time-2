@@ -35,8 +35,8 @@ so that every later story has a working, reproducible substrate to build on.
   - [x] Install `@supabase/supabase-js` (`pnpm add @supabase/supabase-js` in `app/`); instantiate exactly **one** client in `app/data/supabaseClient.ts`, reading `EXPO_PUBLIC_SUPABASE_URL` / `EXPO_PUBLIC_SUPABASE_ANON_KEY` from env (Expo's `EXPO_PUBLIC_*` convention — anything without that prefix is not exposed to client code)
   - [x] Add a startup health check (e.g. a lightweight call through the client, such as `supabase.auth.getSession()` against the running Kong gateway) that surfaces a clear error if the stack from Task 1 is unreachable
 - [x] Task 3: Scaffold `packages/shared-types` as a workspace package (AC: #3, #4)
-  - [x] Set up pnpm workspaces at the repo root (`pnpm-workspace.yaml` listing `app` and `packages/*`) so `app/` and (later) `supabase/functions/*` can import `@tv-time-2/shared-types` — Edge Functions run on Deno and cannot use pnpm workspace resolution directly, so plan for that package's contents to also be readable as plain `.ts` importable via Deno's npm compat or a build step later (do not over-build this now; a stub package is sufficient for Story 1.1)
-  - [x] Configure `app/metro.config.js` for the pnpm monorepo: enable symlink resolution (`config.resolver.unstable_enableSymlinks = true`) and add the repo root to `config.watchFolders` — without this, Metro cannot resolve `@tv-time-2/shared-types` through pnpm's non-hoisted, symlinked `node_modules` structure
+  - [x] Set up pnpm workspaces at the repo root (`pnpm-workspace.yaml` listing `app` and `packages/*`) so `app/` and (later) `supabase/functions/*` can import `@popcorn-time/shared-types` — Edge Functions run on Deno and cannot use pnpm workspace resolution directly, so plan for that package's contents to also be readable as plain `.ts` importable via Deno's npm compat or a build step later (do not over-build this now; a stub package is sufficient for Story 1.1)
+  - [x] Configure `app/metro.config.js` for the pnpm monorepo: enable symlink resolution (`config.resolver.unstable_enableSymlinks = true`) and add the repo root to `config.watchFolders` — without this, Metro cannot resolve `@popcorn-time/shared-types` through pnpm's non-hoisted, symlinked `node_modules` structure
   - [x] Define and export the shared error envelope type: `{ message: string; code: string; details: unknown }` — this is the one shape both PostgREST/GoTrue's default errors and every Edge Function response must conform to (ARCH-10)
   - [x] Leave a placeholder/README note that generated Supabase types (`supabase gen types typescript`) and Zod schemas (mood enum, note cap) land here once the first migration exists (Story 1.5+) — nothing to generate yet since there are no tables
 - [x] Task 4: Wire up `supabase/migrations/` and `supabase/functions/` as empty, ready directories (AC: #3)
@@ -107,7 +107,7 @@ No test framework is initialized in this project yet (the Test Architecture Ente
 - No conflicts or variances detected — this is a greenfield scaffold with nothing pre-existing to reconcile against.
 
 ```text
-tv-time-2/
+popcorn-time/
   app/                     # Expo/React Native client
     features/
       home/                # Up Next, Watchlist shelf, Recommendations shelf
@@ -136,11 +136,11 @@ Note: the `supabase/functions/*` subdirectories and their contents shown above b
 ### References
 
 - [Source: _bmad-output/planning-artifacts/epics.md#Story 1.1: Project foundation boots locally] — story statement, acceptance criteria, epic framing
-- [Source: _bmad-output/planning-artifacts/architecture/architecture-tv-time-2-2026-07-02/ARCHITECTURE-SPINE.md#AD-13] — pinned-tag rule
-- [Source: _bmad-output/planning-artifacts/architecture/architecture-tv-time-2-2026-07-02/ARCHITECTURE-SPINE.md#Structural Seed] — exact folder layout
-- [Source: _bmad-output/planning-artifacts/architecture/architecture-tv-time-2-2026-07-02/ARCHITECTURE-SPINE.md#Consistency Conventions] — naming, id/timestamp/error-envelope formats
-- [Source: _bmad-output/planning-artifacts/architecture/architecture-tv-time-2-2026-07-02/ARCHITECTURE-SPINE.md#Stack] — Expo SDK 56 / TS 6.0.3 / Postgres 17 pins
-- [Source: _bmad-output/planning-artifacts/architecture/architecture-tv-time-2-2026-07-02/ARCHITECTURE-SPINE.md#Deployment & Environments] — two-environments-only note
+- [Source: _bmad-output/planning-artifacts/architecture/architecture-popcorn-time-2026-07-02/ARCHITECTURE-SPINE.md#AD-13] — pinned-tag rule
+- [Source: _bmad-output/planning-artifacts/architecture/architecture-popcorn-time-2026-07-02/ARCHITECTURE-SPINE.md#Structural Seed] — exact folder layout
+- [Source: _bmad-output/planning-artifacts/architecture/architecture-popcorn-time-2026-07-02/ARCHITECTURE-SPINE.md#Consistency Conventions] — naming, id/timestamp/error-envelope formats
+- [Source: _bmad-output/planning-artifacts/architecture/architecture-popcorn-time-2026-07-02/ARCHITECTURE-SPINE.md#Stack] — Expo SDK 56 / TS 6.0.3 / Postgres 17 pins
+- [Source: _bmad-output/planning-artifacts/architecture/architecture-popcorn-time-2026-07-02/ARCHITECTURE-SPINE.md#Deployment & Environments] — two-environments-only note
 - [Web: https://github.com/supabase/supabase/blob/master/docker/docker-compose.yml] — exact current image tags (fetched 2026-07-02)
 - [Web: https://releasebot.io/updates/supabase] — noted upcoming 2026-07-06 breaking changes (anon-key OpenAPI spec access removal, `API_EXTERNAL_URL` prefix change)
 - [Web: https://expo.dev/changelog/sdk-56] / https://docs.expo.dev/guides/typescript/] — confirms TypeScript 6.0.3 ships with SDK 56 templates
@@ -161,7 +161,7 @@ Claude Opus 4.8 (claude-opus-4-8) — BMad Dev Story workflow.
 - `pnpm run verify` (scripts/smoke-check.mjs) → six services healthy + gateway
   accepts anon key at `/auth/v1/health` (HTTP 200).
 - `expo export --platform android` → Metro bundled 635 modules (2.3 MB Hermes
-  bytecode), env loaded, `@tv-time-2/shared-types` resolved through the pnpm
+  bytecode), env loaded, `@popcorn-time/shared-types` resolved through the pnpm
   symlink + `metro.config.js` (verified with a temporary import, then reverted).
 - `tsc --noEmit` clean for both `app/` and `packages/shared-types`.
 

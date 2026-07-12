@@ -140,15 +140,15 @@ Re-review 2026-07-05 (adversarial re-run: Blind Hunter + Edge Case Hunter + Acce
 ### References
 
 - [Source: _bmad-output/planning-artifacts/epics.md#Story 1.4: Search a real title through the proxied catalog] — story, ACs, scope wall (search only)
-- [Source: _bmad-output/planning-artifacts/architecture/architecture-tv-time-2-2026-07-02/ARCHITECTURE-SPINE.md#AD-6] — proxy + `catalog_cache` schema/TTL, disposable, separate from `known_episode_state`
+- [Source: _bmad-output/planning-artifacts/architecture/architecture-popcorn-time-2026-07-02/ARCHITECTURE-SPINE.md#AD-6] — proxy + `catalog_cache` schema/TTL, disposable, separate from `known_episode_state`
 - [Source: …/ARCHITECTURE-SPINE.md#AD-2] — Edge Functions are the only home for custom logic; only caller of TMDB
 - [Source: …/ARCHITECTURE-SPINE.md#AD-3] — no local titles table; reference by `tmdb_id`
 - [Source: …/ARCHITECTURE-SPINE.md#AD-1] — RLS deny-by-default (applies to `catalog_cache`)
 - [Source: …/ARCHITECTURE-SPINE.md#Consistency Conventions] — `tmdb_id`/`media_type` binding, verb-first function names, error envelope, JWT-via-auth-helper
-- [Source: _bmad-output/planning-artifacts/prds/prd-tv-time-2-2026-07-02/prd.md#FR6-FR9, NFR9] — search-as-you-type, retry state preserving query, gradient poster placeholder, proxied-catalog latency
-- [Source: _bmad-output/planning-artifacts/prds/prd-tv-time-2-2026-07-02/addendum.md#H2] — catalog API-key/proxy rationale; OQ#11 (TMDB licensing/fallback) unresolved
-- [Source: _bmad-output/planning-artifacts/ux-designs/ux-tv-time-2-2026-07-02/EXPERIENCE.md#State Patterns] — Search empty / Search error / Poster missing copy (verbatim)
-- [Source: _bmad-output/planning-artifacts/ux-designs/ux-tv-time-2-2026-07-02/DESIGN.md#Components] — title-card + poster (gradient placeholder) specs
+- [Source: _bmad-output/planning-artifacts/prds/prd-popcorn-time-2026-07-02/prd.md#FR6-FR9, NFR9] — search-as-you-type, retry state preserving query, gradient poster placeholder, proxied-catalog latency
+- [Source: _bmad-output/planning-artifacts/prds/prd-popcorn-time-2026-07-02/addendum.md#H2] — catalog API-key/proxy rationale; OQ#11 (TMDB licensing/fallback) unresolved
+- [Source: _bmad-output/planning-artifacts/ux-designs/ux-popcorn-time-2026-07-02/EXPERIENCE.md#State Patterns] — Search empty / Search error / Poster missing copy (verbatim)
+- [Source: _bmad-output/planning-artifacts/ux-designs/ux-popcorn-time-2026-07-02/DESIGN.md#Components] — title-card + poster (gradient placeholder) specs
 - [Source: _bmad-output/implementation-artifacts/1-2-create-an-account-and-sign-in-google-free.md] — migration mechanism, deny-by-default grant surgery, envelope, single client
 - [Source: _bmad-output/implementation-artifacts/1-3-themed-app-shell-with-bottom-navigation-dark-mode.md] — theme tokens, `Screen` primitive, warm-voice/a11y floor, testing posture
 - [Source: _bmad-output/implementation-artifacts/deferred-work.md] — edge-runtime health/remote-import trap (now active in 1.4)

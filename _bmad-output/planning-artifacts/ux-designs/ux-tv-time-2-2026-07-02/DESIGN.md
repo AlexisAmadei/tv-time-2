@@ -1,5 +1,5 @@
 ---
-name: tv-time-2
+name: popcorn-time
 description: Cozy, vintage-flavored mobile tracker for films & TV. Spiritual successor to TV Time. "Retro Technicolor" — dark-first (VHS Dusk) with a Paper White day mode. Log-rate-react in under 15 seconds.
 status: final
 updated: 2026-07-02
@@ -66,7 +66,7 @@ components:
 
 ## Brand & Style
 
-tv-time-2 is a love letter to a discontinued app. When TV Time went away it left a hole — a cozy place to remember what you watched and how it made you feel. This is the spiritual successor: a personal diary for films and TV, warm and unhurried, that rewards showing up without ever nagging.
+popcorn-time is a love letter to a discontinued app. When TV Time went away it left a hole — a cozy place to remember what you watched and how it made you feel. This is the spiritual successor: a personal diary for films and TV, warm and unhurried, that rewards showing up without ever nagging.
 
 The wordmark is **tv-time** (lowercase, Fraunces) — the "-2" is versioning, never shown in UI.
 

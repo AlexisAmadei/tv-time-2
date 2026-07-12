@@ -133,9 +133,9 @@ Copy the hex exactly from `DESIGN.md` frontmatter. Both modes must exist in `tok
 ### References
 
 - [Source: _bmad-output/planning-artifacts/epics.md#Story 1.3: Themed app shell with bottom navigation (dark mode)] — story statement, ACs, Epic 1 framing (walking skeleton, "dark wired here / Paper White is Epic 4")
-- [Source: _bmad-output/planning-artifacts/ux-designs/ux-tv-time-2-2026-07-02/DESIGN.md] — full color/type/spacing/radius/elevation tokens (frontmatter), Components (bottom-nav, fast-add-fab), Do's/Don'ts, gold-reserved rule
-- [Source: _bmad-output/planning-artifacts/ux-designs/ux-tv-time-2-2026-07-02/EXPERIENCE.md#State Patterns] — Home empty-state copy; #Voice and Tone (Do/Don't); #Accessibility Floor; #IA (5-slot bar, center (+))
-- [Source: _bmad-output/planning-artifacts/architecture/architecture-tv-time-2-2026-07-02/ARCHITECTURE-SPINE.md#Structural Seed] — feature-module layout; #Stack table (Expo SDK 56 / RN 0.85 / React 19.2 / TS 6.0.3); L237 Navigation as design-paradigm slot; L143 TS `types: []` note
+- [Source: _bmad-output/planning-artifacts/ux-designs/ux-popcorn-time-2026-07-02/DESIGN.md] — full color/type/spacing/radius/elevation tokens (frontmatter), Components (bottom-nav, fast-add-fab), Do's/Don'ts, gold-reserved rule
+- [Source: _bmad-output/planning-artifacts/ux-designs/ux-popcorn-time-2026-07-02/EXPERIENCE.md#State Patterns] — Home empty-state copy; #Voice and Tone (Do/Don't); #Accessibility Floor; #IA (5-slot bar, center (+))
+- [Source: _bmad-output/planning-artifacts/architecture/architecture-popcorn-time-2026-07-02/ARCHITECTURE-SPINE.md#Structural Seed] — feature-module layout; #Stack table (Expo SDK 56 / RN 0.85 / React 19.2 / TS 6.0.3); L237 Navigation as design-paradigm slot; L143 TS `types: []` note
 - [Source: _bmad-output/implementation-artifacts/1-2-create-an-account-and-sign-in-google-free.md] — the auth gate, `SignedInScreen` (holds sign-out), `useSession`/`signOut`, additive-module precedent, testing posture
 - [Source: app/AGENTS.md] — Expo SDK 56 pin; use `expo install`; read versioned SDK 56 docs before native-dep work
 - [Web: https://docs.expo.dev/versions/v56.0.0/ · https://docs.expo.dev/develop/user-interface/fonts/] — SDK 56 API surface; `expo-font` `useFonts` local-bundle pattern (verify against current docs at implementation time)

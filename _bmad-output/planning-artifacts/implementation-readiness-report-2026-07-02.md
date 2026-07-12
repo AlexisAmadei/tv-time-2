@@ -1,18 +1,18 @@
 ---
 stepsCompleted: [step-01-document-discovery, step-02-prd-analysis, step-03-epic-coverage-validation, step-04-ux-alignment, step-05-epic-quality-review, step-06-final-assessment]
 documentsIncluded:
-  - prds/prd-tv-time-2-2026-07-02/prd.md
-  - prds/prd-tv-time-2-2026-07-02/addendum.md
-  - architecture/architecture-tv-time-2-2026-07-02/ARCHITECTURE-SPINE.md
+  - prds/prd-popcorn-time-2026-07-02/prd.md
+  - prds/prd-popcorn-time-2026-07-02/addendum.md
+  - architecture/architecture-popcorn-time-2026-07-02/ARCHITECTURE-SPINE.md
   - epics.md
-  - ux-designs/ux-tv-time-2-2026-07-02/DESIGN.md
-  - ux-designs/ux-tv-time-2-2026-07-02/EXPERIENCE.md
+  - ux-designs/ux-popcorn-time-2026-07-02/DESIGN.md
+  - ux-designs/ux-popcorn-time-2026-07-02/EXPERIENCE.md
 ---
 
 # Implementation Readiness Assessment Report
 
 **Date:** 2026-07-02
-**Project:** tv-time-2
+**Project:** popcorn-time
 
 ## Document Inventory
 
@@ -310,4 +310,4 @@ This assessment reviewed **6 planning documents** and found **1 critical cross-a
 
 ---
 
-*Assessed by: Implementation Readiness workflow (BMad) · Assessor role: PM / requirements-traceability · Date: 2026-07-02 · Project: tv-time-2*
+*Assessed by: Implementation Readiness workflow (BMad) · Assessor role: PM / requirements-traceability · Date: 2026-07-02 · Project: popcorn-time*

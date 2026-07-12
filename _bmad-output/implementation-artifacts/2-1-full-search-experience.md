@@ -111,9 +111,9 @@ Pattern: each feature commit is followed, when review findings exist, by a dedic
 
 - [Source: _bmad-output/planning-artifacts/epics.md#Story 2.1: Full search experience] — story statement, ACs, FR6/FR8/FR9/UX-DR5/UX-DR16
 - [Source: _bmad-output/planning-artifacts/epics.md#Requirements Inventory] — FR6 (search as-you-type, backend-proxied), FR8 (retry state + preserved query), FR9 (gradient placeholder)
-- [Source: _bmad-output/planning-artifacts/architecture/architecture-tv-time-2-2026-07-02/ARCHITECTURE-SPINE.md#AD-6, #ARCH-10, #AD-1] — proxy boundary, identifier convention, deny-by-default
-- [Source: _bmad-output/planning-artifacts/ux-designs/ux-tv-time-2-2026-07-02/DESIGN.md#Components] — poster/gradient placeholder spec (UX-DR5)
-- [Source: _bmad-output/planning-artifacts/ux-designs/ux-tv-time-2-2026-07-02/EXPERIENCE.md#State Patterns] — Search empty / Search error / Poster missing copy (verbatim), UX-DR16 retry pattern
+- [Source: _bmad-output/planning-artifacts/architecture/architecture-popcorn-time-2026-07-02/ARCHITECTURE-SPINE.md#AD-6, #ARCH-10, #AD-1] — proxy boundary, identifier convention, deny-by-default
+- [Source: _bmad-output/planning-artifacts/ux-designs/ux-popcorn-time-2026-07-02/DESIGN.md#Components] — poster/gradient placeholder spec (UX-DR5)
+- [Source: _bmad-output/planning-artifacts/ux-designs/ux-popcorn-time-2026-07-02/EXPERIENCE.md#State Patterns] — Search empty / Search error / Poster missing copy (verbatim), UX-DR16 retry pattern
 - [Source: _bmad-output/implementation-artifacts/1-4-search-a-real-title-through-the-proxied-catalog.md] — original search build, Review Findings (gradient placeholder patch, invoke timeout patch), File List, Completion Notes
 - [Source: _bmad-output/implementation-artifacts/1-5-*.md, 1-6-prove-the-private-by-default-wall.md] — subsequent changes layered on `AddScreen.tsx`/outbox; testing-posture confirmation ("no test framework yet")
 - [Source: app/features/add/AddScreen.tsx; app/data/catalog.ts] — current implementation read in full for this audit

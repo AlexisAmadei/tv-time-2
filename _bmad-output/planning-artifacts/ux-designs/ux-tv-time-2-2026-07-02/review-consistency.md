@@ -1,4 +1,4 @@
-# Consistency / Cross-Reference Review — tv-time-2 UX spec
+# Consistency / Cross-Reference Review — popcorn-time UX spec
 
 Lens: cross-referencing `EXPERIENCE.md` (behavior spine) against `DESIGN.md` (visual spine) and the `mockups/key-screens.html` render. Spine wins on any spine-vs-mock conflict; mock issues are flagged as fix-notes. Scope: token resolution, doc-vs-doc contradictions, mock-vs-spine contradictions, and light/dark role-mapping consistency.
 
@@ -16,7 +16,7 @@ Lens: cross-referencing `EXPERIENCE.md` (behavior spine) against `DESIGN.md` (vi
 
 - **Mock nav label "You" vs spine "Profile".** Spine is fixed: Home · Diary · (+) · Feed · Profile (`EXPERIENCE.md` line 27, `DESIGN.md` line 63/127). The mockup nav renders the 5th slot as **"You"** (lines 147 & 195). Order is correct; only the label differs. Spine wins — mock fix-note: relabel "You" → "Profile" (or ratify "You" in both spines if intended).
 
-- **Mock logo reads "tv-time", app name is "tv-time-2".** Mockup `.logo` shows "tv-time" (lines 109 & 205). Low-stakes but it's the wordmark. Mock fix-note: set to "tv-time-2" (or document the shortened wordmark in DESIGN Typography as intentional).
+- **Mock logo reads "tv-time", app name is "popcorn-time".** Mockup `.logo` shows "tv-time" (lines 109 & 205). Low-stakes but it's the wordmark. Mock fix-note: set to "popcorn-time" (or document the shortened wordmark in DESIGN Typography as intentional).
 
 - **Notify bell has no frontmatter component token; EXPERIENCE points at `{components.poster}` as a proxy.** `EXPERIENCE.md` lines 55 & 96 tag the notify bell with `{components.poster}` "context," but the bell is a distinct component described only in DESIGN prose (line 128) with no frontmatter entry. The reference technically resolves (poster exists) but is semantically wrong. Fix: add a `notify-bell` (or `bell`) entry to `DESIGN.md` frontmatter `components:` and point EXPERIENCE at `{components.notify-bell}`.
 

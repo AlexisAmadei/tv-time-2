@@ -89,7 +89,7 @@ This story adds the **✓ Watched control on the Up Next shelf** and the **organ
 
 `AD-10`'s RPC is derive-from-full-watch-set: it reads `public.watches` (server-side, already-synced rows) to compute "the first unwatched episode." If the recompute call were fired directly from the UI right after `logWatch()`'s *local* outbox write (as `trackedShows.ts`'s `trackShow()` does for its own, unrelated write), it would race the still-pending sync — the just-logged episode might not be in `watches` yet, so the RPC would compute the *same* pointer as before, not the advanced one. Putting the call inside `watchSync.ts`, right after that specific row's own successful upsert, removes the race entirely: by construction, the row the RPC needs to see is already there. This also means the existing sync retry triggers (opportunistic-after-log, foreground, reconnect — see `watchSync.ts`'s file header) automatically become the "later syncs" mechanism AC2 requires for the offline case, with no new retry code.
 
-[Source: _bmad-output/planning-artifacts/architecture/architecture-tv-time-2-2026-07-02/ARCHITECTURE-SPINE.md#AD-10]
+[Source: _bmad-output/planning-artifacts/architecture/architecture-popcorn-time-2026-07-02/ARCHITECTURE-SPINE.md#AD-10]
 [Source: app/data/watchSync.ts — the three existing retry triggers]
 [Source: app/data/trackedShows.ts#trackShow — the earlier, different-context RPC-call-after-write pattern, not applicable here]
 
@@ -141,11 +141,11 @@ Pattern holds: every feature commit is followed by a dedicated `fix:` commit onc
 
 - [Source: _bmad-output/planning-artifacts/epics.md#Story 3.2: One-tap ✓ Watched advances the pointer] — story statement + all five ACs (FR11, FR14, FR15, ARCH-9/AD-10, UX-DR10, UX-DR23)
 - [Source: _bmad-output/planning-artifacts/epics.md#Epic 3 preamble] — the pointer-RPC contract note ("derive/recompute-from-the-full-watch-set... so the same function correctly serves both organic advance and recompute-after-delete")
-- [Source: _bmad-output/planning-artifacts/prds/prd-tv-time-2-2026-07-02/prd.md#FR11, FR14, FR15, NFR1] — FR11's exact pointer-advance language; NFR1's "Start = tap on the Up Next card" testability note (why no title-detail control this story)
-- [Source: _bmad-output/planning-artifacts/architecture/architecture-tv-time-2-2026-07-02/ARCHITECTURE-SPINE.md#AD-10] — the binding RPC contract (signature, derive-not-increment, single-writer)
-- [Source: _bmad-output/planning-artifacts/architecture/architecture-tv-time-2-2026-07-02/ARCHITECTURE-SPINE.md#AD-4] — the outbox contract `logWatch`/`watchSync` already implement
-- [Source: _bmad-output/planning-artifacts/ux-designs/ux-tv-time-2-2026-07-02/EXPERIENCE.md#Component Patterns, #State Patterns] — "Watched / Continue control" row; "Watched confirmed" soft-confirmation copy
-- [Source: _bmad-output/planning-artifacts/ux-designs/ux-tv-time-2-2026-07-02/DESIGN.md#Components] — `watched-badge: 'rounded-sm, primary fill, uppercase label.'`
+- [Source: _bmad-output/planning-artifacts/prds/prd-popcorn-time-2026-07-02/prd.md#FR11, FR14, FR15, NFR1] — FR11's exact pointer-advance language; NFR1's "Start = tap on the Up Next card" testability note (why no title-detail control this story)
+- [Source: _bmad-output/planning-artifacts/architecture/architecture-popcorn-time-2026-07-02/ARCHITECTURE-SPINE.md#AD-10] — the binding RPC contract (signature, derive-not-increment, single-writer)
+- [Source: _bmad-output/planning-artifacts/architecture/architecture-popcorn-time-2026-07-02/ARCHITECTURE-SPINE.md#AD-4] — the outbox contract `logWatch`/`watchSync` already implement
+- [Source: _bmad-output/planning-artifacts/ux-designs/ux-popcorn-time-2026-07-02/EXPERIENCE.md#Component Patterns, #State Patterns] — "Watched / Continue control" row; "Watched confirmed" soft-confirmation copy
+- [Source: _bmad-output/planning-artifacts/ux-designs/ux-popcorn-time-2026-07-02/DESIGN.md#Components] — `watched-badge: 'rounded-sm, primary fill, uppercase label.'`
 - [Source: supabase/migrations/0007_recompute_next_episode_pointer.sql] — the existing, unmodified RPC this story consumes
 - [Source: app/data/watchLog.ts] — the outbox commit this story extends with a real `tmdbEpisodeId`
 - [Source: app/data/watchSync.ts] — the drain loop this story's recompute call hooks into, and the three existing retry triggers that satisfy AC2's offline case

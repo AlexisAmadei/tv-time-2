@@ -1,4 +1,4 @@
-# Voice & Microcopy Review — tv-time-2
+# Voice & Microcopy Review — popcorn-time
 
 **Lens:** Voice & Microcopy. **Intended voice:** warm & personal — cozy, encouraging, lightly sentimental; gentle emoji, one max; not cheeky-witty, not coldly minimal. **Governing feeling:** *logging is faster than forgetting.*
 

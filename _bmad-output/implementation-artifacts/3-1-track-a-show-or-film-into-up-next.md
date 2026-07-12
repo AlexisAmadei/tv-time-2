@@ -107,7 +107,7 @@ Dismissed as noise / non-issues (13): `watchlistKey`/`watchKey` reuse in the tra
 Epic 3's own preamble (epics.md, right above Story 3.1) already flags this: *"Recommend renaming AD-10's `advance_next_episode_pointer` → `recompute_next_episode_pointer`... to stop the name implying forward-only."* That rename was **already applied** to `ARCHITECTURE-SPINE.md`'s AD-10 (which now reads `recompute_next_episode_pointer(user_id, tmdb_id)`, "derive-from-full-watch-set, not a monotonic increment") — but the epics' own AC text for 3.1/3.2 (ARCH-9 references) was never updated to match, so it still says `advance_next_episode_pointer`. The architecture spine is the binding source (`binds: [FR1-FR45, NFR1-NFR11]` in its frontmatter); build against **`recompute_next_episode_pointer`**. This also matters for naming consistency: 3.7 (edit/remove a logged watch) explicitly reuses this same function for its recompute-after-delete path — a name that implies "advance" would already be wrong there, which is exactly why the rename happened.
 
 [Source: _bmad-output/planning-artifacts/epics.md — Epic 3 preamble, "Pointer-RPC contract" note]
-[Source: _bmad-output/planning-artifacts/architecture/architecture-tv-time-2-2026-07-02/ARCHITECTURE-SPINE.md#AD-10]
+[Source: _bmad-output/planning-artifacts/architecture/architecture-popcorn-time-2026-07-02/ARCHITECTURE-SPINE.md#AD-10]
 
 ### Why the pointer RPC needs `catalog_cache`, and what that implies
 
@@ -125,14 +125,14 @@ Every function so far (`handle_new_user` in 0001, `effective_visibility` in 0004
 
 [Source: supabase/migrations/0002_catalog_cache.sql — the deny-by-default grant this RPC must work around]
 [Source: supabase/migrations/0004_visibility.sql — the only prior custom function, for contrast (security invoker, no auth context)]
-[Source: _bmad-output/planning-artifacts/architecture/architecture-tv-time-2-2026-07-02/ARCHITECTURE-SPINE.md#AD-1 — the RLS invariant this function must not silently bypass for the caller]
+[Source: _bmad-output/planning-artifacts/architecture/architecture-popcorn-time-2026-07-02/ARCHITECTURE-SPINE.md#AD-1 — the RLS invariant this function must not silently bypass for the caller]
 
 ### The 2.4-deferred whole-page empty-state reconciliation — this is that moment
 
 Story 2.4's Dev Notes explicitly named this story as the one that would own reconciling `EXPERIENCE.md`'s two Home empty-state rows ("Empty Home (new user)" — whole-page — vs. "Empty Watchlist" — shelf-scoped) once Up Next existed to reconcile against. Task 6 implements exactly that: whole-page copy only when *both* shelves are genuinely empty, per-shelf copy otherwise. Do not build anything more elaborate (e.g. a third state for "one shelf still loading, one empty") — treat "still loading" as not-yet-decided and show that shelf's own loading state, only collapsing to the whole-page copy once both have resolved to empty.
 
 [Source: _bmad-output/implementation-artifacts/2-4-watchlist-shelf-on-home.md — "Why this story retires the 1.3 placeholder" Dev Note, explicitly forward-referencing this story]
-[Source: _bmad-output/planning-artifacts/ux-designs/ux-tv-time-2-2026-07-02/EXPERIENCE.md — State Patterns table, "Empty Home (new user)" vs "Empty Watchlist | Home shelf" rows]
+[Source: _bmad-output/planning-artifacts/ux-designs/ux-popcorn-time-2026-07-02/EXPERIENCE.md — State Patterns table, "Empty Home (new user)" vs "Empty Watchlist | Home shelf" rows]
 
 ### Existing code this story extends (read before touching)
 
@@ -180,9 +180,9 @@ Pattern: every feature commit in Epic 2 was followed by a dedicated `fix:` patch
 
 - [Source: _bmad-output/planning-artifacts/epics.md#Story 3.1: Track a show or film into Up Next] — story statement + all four ACs (FR10, ARCH-5, ARCH-9, ARCH-10, UX-DR15)
 - [Source: _bmad-output/planning-artifacts/epics.md#Epic 3 preamble] — the pointer-RPC rename note, the NFR1 exit-gate note (relevant to later 3.2, not this story's own gate)
-- [Source: _bmad-output/planning-artifacts/architecture/architecture-tv-time-2-2026-07-02/ARCHITECTURE-SPINE.md#AD-10] — the binding, current RPC name/contract ("derive/recompute-from-full-watch-set")
-- [Source: _bmad-output/planning-artifacts/architecture/architecture-tv-time-2-2026-07-02/ARCHITECTURE-SPINE.md#AD-1] — RLS-as-authorization invariant this story's `security definer` function must not bypass for the *caller's* identity, only for the `catalog_cache` read
-- [Source: _bmad-output/planning-artifacts/ux-designs/ux-tv-time-2-2026-07-02/EXPERIENCE.md] — IA table (Up Next above Watchlist), "Empty Home (new user)" row, Component Patterns table (episode-state badge explicitly deferred, see Scope wall)
+- [Source: _bmad-output/planning-artifacts/architecture/architecture-popcorn-time-2026-07-02/ARCHITECTURE-SPINE.md#AD-10] — the binding, current RPC name/contract ("derive/recompute-from-full-watch-set")
+- [Source: _bmad-output/planning-artifacts/architecture/architecture-popcorn-time-2026-07-02/ARCHITECTURE-SPINE.md#AD-1] — RLS-as-authorization invariant this story's `security definer` function must not bypass for the *caller's* identity, only for the `catalog_cache` read
+- [Source: _bmad-output/planning-artifacts/ux-designs/ux-popcorn-time-2026-07-02/EXPERIENCE.md] — IA table (Up Next above Watchlist), "Empty Home (new user)" row, Component Patterns table (episode-state badge explicitly deferred, see Scope wall)
 - [Source: supabase/migrations/0005_watchlist_items.sql] — the closest schema analog to mirror for `tracked_shows`
 - [Source: supabase/migrations/0002_catalog_cache.sql] — why the RPC needs `security definer` (zero authenticated grants on this table)
 - [Source: supabase/migrations/0004_visibility.sql] — the only prior custom SQL function in the codebase, for contrast

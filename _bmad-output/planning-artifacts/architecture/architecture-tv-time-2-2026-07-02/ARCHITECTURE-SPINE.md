@@ -1,5 +1,5 @@
 ---
-name: 'tv-time-2'
+name: 'popcorn-time'
 type: architecture-spine
 purpose: build-substrate
 altitude: feature           # keeps the epics/stories that follow this PRD coherent
@@ -10,15 +10,15 @@ created: '2026-07-02'
 updated: '2026-07-02'
 binds: [FR1-FR45, NFR1-NFR11]
 sources:
-  - '_bmad-output/planning-artifacts/prds/prd-tv-time-2-2026-07-02/prd.md'
-  - '_bmad-output/planning-artifacts/prds/prd-tv-time-2-2026-07-02/addendum.md'
-  - '_bmad-output/planning-artifacts/briefs/brief-tv-time-2-2026-07-02/brief.md'
-  - '_bmad-output/planning-artifacts/ux-designs/ux-tv-time-2-2026-07-02/EXPERIENCE.md'
-  - '_bmad-output/planning-artifacts/ux-designs/ux-tv-time-2-2026-07-02/DESIGN.md'
+  - '_bmad-output/planning-artifacts/prds/prd-popcorn-time-2026-07-02/prd.md'
+  - '_bmad-output/planning-artifacts/prds/prd-popcorn-time-2026-07-02/addendum.md'
+  - '_bmad-output/planning-artifacts/briefs/brief-popcorn-time-2026-07-02/brief.md'
+  - '_bmad-output/planning-artifacts/ux-designs/ux-popcorn-time-2026-07-02/EXPERIENCE.md'
+  - '_bmad-output/planning-artifacts/ux-designs/ux-popcorn-time-2026-07-02/DESIGN.md'
 companions: []
 ---
 
-# Architecture Spine — tv-time-2
+# Architecture Spine — popcorn-time
 
 ## Design Paradigm
 
@@ -154,7 +154,7 @@ graph LR
 ## Structural Seed
 
 ```text
-tv-time-2/
+popcorn-time/
   app/                     # Expo/React Native client
     features/
       home/                # Up Next, Watchlist shelf, Recommendations shelf

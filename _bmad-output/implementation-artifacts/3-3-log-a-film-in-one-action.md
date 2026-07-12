@@ -110,12 +110,12 @@ Pattern holds: every feature commit is followed by a dedicated `fix:` commit onc
 ### References
 
 - [Source: _bmad-output/planning-artifacts/epics.md#Story 3.3: Log a film in one action] — story statement + all three ACs (FR12, FR14, FR15, UX-DR17, UX-DR20)
-- [Source: _bmad-output/planning-artifacts/prds/prd-tv-time-2-2026-07-02/prd.md#FR12, FR14, FR15] — FR12's exact "log a film as watched in one action" language; FR14/FR15's instant-commit and timestamp requirements (already satisfied by the shared outbox)
-- [Source: _bmad-output/planning-artifacts/architecture/architecture-tv-time-2-2026-07-02/ARCHITECTURE-SPINE.md#AD-3] — watch-as-atomic-unit (why a rewatch is a new row, not a blocked/disabled action)
-- [Source: _bmad-output/planning-artifacts/architecture/architecture-tv-time-2-2026-07-02/ARCHITECTURE-SPINE.md#AD-4] — the outbox contract `logWatch`/`watchSync` already implement, unchanged by this story
-- [Source: _bmad-output/planning-artifacts/architecture/architecture-tv-time-2-2026-07-02/ARCHITECTURE-SPINE.md#AD-10] — the pointer RPC's tv-only applicability (why a film watch correctly never triggers it)
-- [Source: _bmad-output/planning-artifacts/ux-designs/ux-tv-time-2-2026-07-02/EXPERIENCE.md#Component Patterns] — "Watched / Continue control: Title detail, Up Next" row (weighed and explicitly not extended to title detail, per 3.2's precedent)
-- [Source: _bmad-output/planning-artifacts/ux-designs/ux-tv-time-2-2026-07-02/DESIGN.md#Components] — `watched-badge: 'rounded-sm, primary fill, uppercase label.'` (already built, Story 3.2, unchanged)
+- [Source: _bmad-output/planning-artifacts/prds/prd-popcorn-time-2026-07-02/prd.md#FR12, FR14, FR15] — FR12's exact "log a film as watched in one action" language; FR14/FR15's instant-commit and timestamp requirements (already satisfied by the shared outbox)
+- [Source: _bmad-output/planning-artifacts/architecture/architecture-popcorn-time-2026-07-02/ARCHITECTURE-SPINE.md#AD-3] — watch-as-atomic-unit (why a rewatch is a new row, not a blocked/disabled action)
+- [Source: _bmad-output/planning-artifacts/architecture/architecture-popcorn-time-2026-07-02/ARCHITECTURE-SPINE.md#AD-4] — the outbox contract `logWatch`/`watchSync` already implement, unchanged by this story
+- [Source: _bmad-output/planning-artifacts/architecture/architecture-popcorn-time-2026-07-02/ARCHITECTURE-SPINE.md#AD-10] — the pointer RPC's tv-only applicability (why a film watch correctly never triggers it)
+- [Source: _bmad-output/planning-artifacts/ux-designs/ux-popcorn-time-2026-07-02/EXPERIENCE.md#Component Patterns] — "Watched / Continue control: Title detail, Up Next" row (weighed and explicitly not extended to title detail, per 3.2's precedent)
+- [Source: _bmad-output/planning-artifacts/ux-designs/ux-popcorn-time-2026-07-02/DESIGN.md#Components] — `watched-badge: 'rounded-sm, primary fill, uppercase label.'` (already built, Story 3.2, unchanged)
 - [Source: app/data/watchLog.ts] — `logWatch`/`LogWatchInput`, already media-type-generic
 - [Source: app/data/watchSync.ts] — the existing `tv`-only pointer-recompute gate this story verifies but does not touch
 - [Source: app/data/trackedShows.ts] — `TrackedShow.nextEpisodePointer`, "permanently null for films," the doc comment that names the exact gap this story closes

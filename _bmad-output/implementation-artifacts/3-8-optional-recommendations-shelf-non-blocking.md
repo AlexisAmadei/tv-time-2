@@ -130,12 +130,12 @@ No test framework exists in this repo (restated every story since 1.3). Done-bar
 ### References
 
 - [Source: _bmad-output/planning-artifacts/epics.md#Story 3.8: Optional Recommendations shelf (non-blocking)] — story statement + all three ACs (FR42, UJ-1).
-- [Source: _bmad-output/planning-artifacts/prds/prd-tv-time-2-2026-07-02/prd.md#FR42] — "Home *may* show a Recommendations shelf... at most a **simple, non-LLM** heuristic... or a curated shelf; it must never block the log loop and **may ship empty/absent**... LLM-powered recommendations are explicitly v2."
-- [Source: _bmad-output/planning-artifacts/prds/prd-tv-time-2-2026-07-02/prd.md#UJ-1] — the bedtime-log journey; its payoff is the year-count memory line, explicitly *not* dependent on recommendations existing.
-- [Source: _bmad-output/planning-artifacts/prds/prd-tv-time-2-2026-07-02/review-adversarial-general.md] — the resolved UJ-1/FR42 tension confirming a v1 curated/empty shelf is acceptable.
-- [Source: _bmad-output/planning-artifacts/ux-designs/ux-tv-time-2-2026-07-02/EXPERIENCE.md#IA table + Flow 1] — Home hosts Up Next + Watchlist + Recommendations shelves; "recommendation shelf shows skeleton, never blocks the log" (AC2).
-- [Source: _bmad-output/planning-artifacts/ux-designs/ux-tv-time-2-2026-07-02/DESIGN.md#Spacing] — largest gaps separate shelves (Up Next, Watchlist, Recommendations); horizontal shelves scroll, the vertical page does not fight them.
-- [Source: _bmad-output/planning-artifacts/architecture/architecture-tv-time-2-2026-07-02/ARCHITECTURE-SPINE.md#AD-6] — catalog access is always proxied and cached, never direct from the client; the curated list holds ids only, enrichment goes through `fetchTitleDetail`.
+- [Source: _bmad-output/planning-artifacts/prds/prd-popcorn-time-2026-07-02/prd.md#FR42] — "Home *may* show a Recommendations shelf... at most a **simple, non-LLM** heuristic... or a curated shelf; it must never block the log loop and **may ship empty/absent**... LLM-powered recommendations are explicitly v2."
+- [Source: _bmad-output/planning-artifacts/prds/prd-popcorn-time-2026-07-02/prd.md#UJ-1] — the bedtime-log journey; its payoff is the year-count memory line, explicitly *not* dependent on recommendations existing.
+- [Source: _bmad-output/planning-artifacts/prds/prd-popcorn-time-2026-07-02/review-adversarial-general.md] — the resolved UJ-1/FR42 tension confirming a v1 curated/empty shelf is acceptable.
+- [Source: _bmad-output/planning-artifacts/ux-designs/ux-popcorn-time-2026-07-02/EXPERIENCE.md#IA table + Flow 1] — Home hosts Up Next + Watchlist + Recommendations shelves; "recommendation shelf shows skeleton, never blocks the log" (AC2).
+- [Source: _bmad-output/planning-artifacts/ux-designs/ux-popcorn-time-2026-07-02/DESIGN.md#Spacing] — largest gaps separate shelves (Up Next, Watchlist, Recommendations); horizontal shelves scroll, the vertical page does not fight them.
+- [Source: _bmad-output/planning-artifacts/architecture/architecture-popcorn-time-2026-07-02/ARCHITECTURE-SPINE.md#AD-6] — catalog access is always proxied and cached, never direct from the client; the curated list holds ids only, enrichment goes through `fetchTitleDetail`.
 - [Source: app/features/home/HomeScreen.tsx] — the independent-shelf architecture (per-shelf phase/hasLoadedRef/requestSeq, `useFocusEffect`, `wholePageEmpty` reconciliation) this story extends with a third shelf.
 - [Source: app/data/watchlist.ts] — `writeWatchlist` (AC3's mandated reuse) + `getWatchlistKeys` (seed + de-dup filter), both direct-PostgREST, best-effort where noted.
 - [Source: app/data/watchLog.ts] — `watchKey` + `getLoggedKeys` (best-effort de-dup filter).

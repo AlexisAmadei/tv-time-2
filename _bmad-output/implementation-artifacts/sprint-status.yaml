@@ -15,7 +15,7 @@
 # generated: 2026-07-02
 # last_updated: 2026-07-10
 # story 3.4 drafted 2026-07-10: bulk-log sheet (new file, TitleDetailScreen's SeasonRow gains "Mark whole season watched") logs N episodes via existing logWatch()/watchSync outbox unchanged in shape; fixes two latent gaps this story is first to exercise — LogWatchInput lacked rating/mood passthrough (always null since 1.5), and watchSync's per-row-inline pointer-recompute call would fire on partial data when several episodes of the same show sync in one pass (correct for 3.2's one-episode-at-a-time case, wrong for this story's N-episode bulk commit) — moved to once-per-pass-per-show after the row loop; adds 0008 migration locking watches.mood to the FR18 8-chip CHECK per ARCHITECTURE-SPINE's Consistency Conventions; status → ready-for-dev
-# project: tv-time-2
+# project: popcorn-time
 # project_key: NOKEY
 # tracking_system: file-system
 # story_location: {project-root}/_bmad-output/implementation-artifacts
@@ -83,7 +83,7 @@ last_updated: 2026-07-11
 # story 2.1 verified 2026-07-05: all 4 ACs already satisfied by 1.4/1.5/1.6 code, no changes needed, status → review
 # story 2.2 drafted 2026-07-05: ready-for-dev
 # story 2.3 drafted 2026-07-06: watchlist_items table + direct-PostgREST watchlist.ts + ❤️ on TitleCard/detail; status → ready-for-dev
-project: tv-time-2
+project: popcorn-time
 project_key: NOKEY
 tracking_system: file-system
 story_location: "{project-root}/_bmad-output/implementation-artifacts"

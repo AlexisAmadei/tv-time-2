@@ -1,11 +1,11 @@
 ---
-name: tv-time-2
-description: Experience spine for tv-time-2 — cozy mobile films & TV tracker. Owns how it works; DESIGN.md owns how it looks.
+name: popcorn-time
+description: Experience spine for popcorn-time — cozy mobile films & TV tracker. Owns how it works; DESIGN.md owns how it looks.
 status: final
 updated: 2026-07-02
 ---
 
-# tv-time-2 — Experience Spine
+# popcorn-time — Experience Spine
 
 > Single-surface mobile, consumer posture, dark-by-default. Paired with `DESIGN.md` (visual identity). Core promise: **logging is faster than forgetting** — the log→rate→react loop runs in under 15 seconds, and rating never blocks.
 
@@ -107,7 +107,7 @@ The one retention lever — earned, never spammy.
 
 ### Flow 1 — The bedtime log (Léa, 27, 11:20pm, just finished tonight's episode)
 
-1. Léa opens tv-time-2 (dark mode — it's night). Home's **Up Next** has *The Bear* at the top.
+1. Léa opens popcorn-time (dark mode — it's night). Home's **Up Next** has *The Bear* at the top.
 2. She taps the card. **S3E5** is pre-selected as her next episode.
 3. One tap: **✓ Watched.** Soft confirmation; the show advances to S3E6.
 4. A rating prompt slides up — 5 gold stars + mood chips. She taps **4½★** and **😭**. (She could have dismissed it in one tap.)
