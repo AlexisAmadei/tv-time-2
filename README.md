@@ -147,7 +147,7 @@ These are guardrails every later story must follow so nothing downstream drifts:
   (so the allowed set can evolve without a type migration).
 - **Errors** cross every boundary as the shared envelope
   `{ message, code, details }` — exported as `ErrorEnvelope` from
-  `@tv-time-2/shared-types`. PostgREST and GoTrue already return this shape;
+  `@popcorn-time/shared-types`. PostgREST and GoTrue already return this shape;
   Edge Functions must match it exactly rather than inventing their own.
 
 ## Environments

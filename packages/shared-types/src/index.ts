@@ -1,4 +1,4 @@
-// @tv-time-2/shared-types
+// @popcorn-time/shared-types
 //
 // The single source of types shared between the Expo client (`app/`) and the
 // Supabase Edge Functions (`supabase/functions/*`). Kept as plain, build-free

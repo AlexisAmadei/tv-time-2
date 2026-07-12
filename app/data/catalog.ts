@@ -10,7 +10,7 @@
 // and CatalogError/envelope-parsing, so `fetchTitleDetail` reuses them rather
 // than re-forking a second data module.
 
-import { isErrorEnvelope } from '@tv-time-2/shared-types';
+import { isErrorEnvelope } from '@popcorn-time/shared-types';
 
 import { supabase } from './supabaseClient';
 

@@ -1,5 +1,5 @@
 {
-  "name": "@tv-time-2/shared-types",
+  "name": "@popcorn-time/shared-types",
   "version": "0.0.0",
   "private": true,
   "description": "Types shared between the Expo client and Supabase Edge Functions.",

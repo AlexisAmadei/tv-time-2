@@ -1,7 +1,7 @@
 // Metro config for the pnpm monorepo.
 //
 // pnpm uses a non-hoisted, symlinked node_modules layout. Without the settings
-// below, Metro cannot resolve workspace packages (`@tv-time-2/shared-types`)
+// below, Metro cannot resolve workspace packages (`@popcorn-time/shared-types`)
 // or hoisted deps living in the repo-root node_modules.
 
 const { getDefaultConfig } = require('expo/metro-config');
@@ -28,7 +28,7 @@ config.resolver.nodeModulesPaths = [
   path.resolve(workspaceRoot, 'node_modules'),
 ];
 
-// 3. Follow pnpm's symlinks (required to reach @tv-time-2/shared-types).
+// 3. Follow pnpm's symlinks (required to reach @popcorn-time/shared-types).
 config.resolver.unstable_enableSymlinks = true;
 
 module.exports = config;

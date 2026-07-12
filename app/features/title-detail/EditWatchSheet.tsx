@@ -34,7 +34,8 @@ import { editWatch, removeWatch, type LoggedWatch } from '../../data/watchEdit';
 import { MAX_MOODS, MAX_NOTE_LENGTH } from '../../data/watchLog';
 import { useTheme } from '../../theme/ThemeProvider';
 import type { Theme } from '../../theme/tokens';
-import { COPY_SAVE_FAILED } from './TitleDetailScreen';
+
+const COPY_SAVE_FAILED = "Couldn't save that — try again.";
 
 type Props = {
   watch: LoggedWatch | null;

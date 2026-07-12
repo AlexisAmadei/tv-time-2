@@ -2,8 +2,11 @@
   "expo": {
     "extra": {
       "eas": {
-        "projectId": "e2c26dc1-6e22-4871-b309-f34ae5b241d6"
+        "projectId": "adf793ff-4a88-49b6-ab9a-9e572fe6f017"
       }
+    },
+    "android": {
+      "package": "com.popcorntime.kiwidev"
     }
   }
 }

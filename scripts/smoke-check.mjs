@@ -360,8 +360,8 @@ try {
 // the result. A non-empty array here is the actual privacy bug this story
 // exists to prevent.
 if (anonKey) {
-  const SMOKE_A = { email: 'smoke-test-a@tv-time-2.invalid', username: 'smoketestusera' };
-  const SMOKE_B = { email: 'smoke-test-b@tv-time-2.invalid', username: 'smoketestuserb' };
+  const SMOKE_A = { email: 'smoke-test-a@popcorn-time.invalid', username: 'smoketestusera' };
+  const SMOKE_B = { email: 'smoke-test-b@popcorn-time.invalid', username: 'smoketestuserb' };
   const SMOKE_PASSWORD = 'Sm0ke-Test-Password!';
   // Fixed literal UUID (not freshly generated per run) so reruns upsert the
   // same row instead of erroring on a PK conflict or accumulating rows.
@@ -474,7 +474,7 @@ if (anonKey) {
 // Story 3.6 (10d/10e) to cover the note field on the same REACTION_WATCH_ID
 // fixture, since it widens this exact upsert/PATCH contract.
 if (anonKey) {
-  const SMOKE_C = { email: 'smoke-test-c@tv-time-2.invalid', username: 'smoketestuserc' };
+  const SMOKE_C = { email: 'smoke-test-c@popcorn-time.invalid', username: 'smoketestuserc' };
   const SMOKE_PASSWORD = 'Sm0ke-Test-Password!';
   // Fixed literal UUIDs (not per-run) so reruns upsert the same rows in place
   // rather than accumulating or PK-conflicting.
@@ -664,9 +664,9 @@ if (anonKey) {
 // call (3.1/3.2/3.4) only ever advances forward from nothing or from a watch —
 // this is the first DELETE + backward recompute exercised here. -------------
 if (anonKey) {
-  const SMOKE_A = { email: 'smoke-test-a@tv-time-2.invalid', username: 'smoketestusera' };
-  const SMOKE_B = { email: 'smoke-test-b@tv-time-2.invalid', username: 'smoketestuserb' };
-  const SMOKE_D = { email: 'smoke-test-d@tv-time-2.invalid', username: 'smoketestuserd' };
+  const SMOKE_A = { email: 'smoke-test-a@popcorn-time.invalid', username: 'smoketestusera' };
+  const SMOKE_B = { email: 'smoke-test-b@popcorn-time.invalid', username: 'smoketestuserb' };
+  const SMOKE_D = { email: 'smoke-test-d@popcorn-time.invalid', username: 'smoketestuserd' };
   const SMOKE_PASSWORD = 'Sm0ke-Test-Password!';
   // Fixed literal UUIDs (not per-run) so reruns upsert/re-create the same rows
   // rather than accumulating or PK-conflicting.

@@ -1,4 +1,4 @@
-# tv-time-2 — self-hosted Supabase stack (local dev)
+# popcorn-time — self-hosted Supabase stack (local dev)
 #
 # Trimmed to the six core services this project needs for v1:
 #   db (Postgres), auth (GoTrue), rest (PostgREST), storage, functions (Edge
@@ -14,7 +14,7 @@
 # When bumping a tag, re-verify against the upstream compose and record the new
 # pin here — the pin must never be a moving target.
 
-name: tv-time-2
+name: popcorn-time
 
 services:
   db:

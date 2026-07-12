@@ -23,7 +23,7 @@ They land here as their stories arrive:
 - `delete-my-account` — Story 7.2
 
 Each must return the shared `ErrorEnvelope` (`{ message, code, details }`) from
-`@tv-time-2/shared-types` — see ARCH-10. The functions container does **not**
+`@popcorn-time/shared-types` — see ARCH-10. The functions container does **not**
 mount that package, so a function inlines the three-field envelope literal
 (`catalog-search` does); only the client imports the shared type.
 
