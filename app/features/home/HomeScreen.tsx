@@ -33,6 +33,7 @@ import {
   View,
 } from 'react-native';
 
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
@@ -149,6 +150,17 @@ const GRID_COLUMNS = 3;
 
 type ViewMode = 'list' | 'grid';
 
+// Persists the list⇄grid toggle across app restarts (AsyncStorage — already
+// the app's one existing key-value store, via supabaseClient's session
+// storage adapter; no new dependency, no SQLite migration for what's a single
+// UI preference, not sync-relevant state). One key for both tabs, matching
+// `viewMode`'s "one toggle, not per-tab" scope.
+const VIEW_MODE_STORAGE_KEY = 'home.viewMode';
+
+function isViewMode(value: string | null): value is ViewMode {
+  return value === 'list' || value === 'grid';
+}
+
 // Series/Movies tabs — swipeable, mirrors the native tab-bar pattern (tap OR
 // horizontal swipe). No pager library is installed and this app is pinned to
 // Expo SDK 56 (see app/AGENTS.md — SDK bumps are a correct-course decision,
@@ -170,7 +182,32 @@ export default function HomeScreen({ navigation }: Props) {
   const [activeTab, setActiveTab] = useState<'tv' | 'movie'>('tv');
   // Applies to both Series and Movies tabs — one toggle, not per-tab, so
   // switching tabs doesn't surprise the user with a different layout.
+  // Starts 'list' (today's existing default) and is overwritten right after
+  // mount if a persisted choice exists (see the load effect below) — so a
+  // returning user briefly sees 'list' flash to their last choice rather than
+  // block first paint on the AsyncStorage read.
   const [viewMode, setViewMode] = useState<ViewMode>('list');
+
+  useEffect(() => {
+    let cancelled = false;
+    AsyncStorage.getItem(VIEW_MODE_STORAGE_KEY)
+      .then((stored) => {
+        if (!cancelled && isViewMode(stored)) setViewMode(stored);
+      })
+      .catch((err) => {
+        console.warn('home view mode: failed to load persisted preference', err);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const handleViewModeChange = useCallback((mode: ViewMode) => {
+    setViewMode(mode);
+    AsyncStorage.setItem(VIEW_MODE_STORAGE_KEY, mode).catch((err) => {
+      console.warn('home view mode: failed to persist preference', err);
+    });
+  }, []);
   const tabScrollRef = useRef<ScrollView>(null);
   // Screen (see components/Screen.tsx) applies its own horizontal margin, so
   // the pager's usable width is that inner content box, not the raw window
@@ -558,7 +595,7 @@ export default function HomeScreen({ navigation }: Props) {
           })}
         </View>
         <Pressable
-          onPress={() => setViewMode((v) => (v === 'list' ? 'grid' : 'list'))}
+          onPress={() => handleViewModeChange(viewMode === 'list' ? 'grid' : 'list')}
           style={styles.viewToggleButton}
           hitSlop={8}
           accessibilityRole="button"
