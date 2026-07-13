@@ -37,6 +37,7 @@ import {
 } from '../../data/catalog';
 import { getWatchlistKeys, watchlistKey, writeWatchlist } from '../../data/watchlist';
 import { getTrackedKeys, trackShow } from '../../data/trackedShows';
+import { getLoggedKeys, logWatch, watchKey } from '../../data/watchLog';
 import { getWatchesForTitle, type LoggedWatch } from '../../data/watchEdit';
 import type { TitleDetailParams } from '../../navigation/titleDetailParams';
 import BulkLogSheet from './BulkLogSheet';
@@ -57,6 +58,11 @@ export const COPY_SAVE_FAILED = "Couldn't save that — try again.";
 // no guilt/streak language. Reuses the same inline live-region note as the
 // watchlist confirmation (no second confirmation mechanism, per Dev Notes).
 const COPY_TRACKED = 'Added to Up Next.';
+// Films' second action row (was "I'm watching this"/trackShow — a show has an
+// ongoing "next episode" to track, a film doesn't; a film is watched or it
+// isn't). Reuses HomeScreen/AddScreen's exact confirmation copy — one
+// "you logged a watch" string across the app, not a film-specific second one.
+const COPY_WATCHED = 'Logged — nice one.';
 // Story 3.4's AC4/UX-DR20/Flow 2 bulk-log confirmation, verbatim.
 const COPY_SEASON_LOGGED = "That's a whole season in one sitting. Respect.";
 // Story 3.7's "Your watches" section — edit/remove confirmations reuse the
@@ -101,8 +107,14 @@ export default function TitleDetailScreen({ route, navigation }: Props) {
   const [watchlisted, setWatchlisted] = useState(false);
   const [confirmation, setConfirmation] = useState<string | null>(null);
   // Tracked state (Story 3.1) — sibling to the watchlist block above, same
-  // shape, same confirmation machinery (no second mechanism).
+  // shape, same confirmation machinery (no second mechanism). TV only now —
+  // films use `watched` below instead.
   const [tracked, setTracked] = useState(false);
+  // Watched state, films only: a film has no "next episode" to track, so its
+  // second action row logs a `watches` row directly (the same primitive
+  // AddScreen/HomeScreen's "✓ Watched" already use) rather than trackShow's
+  // ongoing-progress `tracked_shows` row.
+  const [watched, setWatched] = useState(false);
   // Which season (if any) has its bulk-log sheet open (Story 3.4). Rendered
   // once at the screen level (not nested per-SeasonRow) — see JSX below.
   const [bulkLogSeason, setBulkLogSeason] = useState<SeasonDetail | null>(null);
@@ -127,6 +139,11 @@ export default function TitleDetailScreen({ route, navigation }: Props) {
   // Set once the user taps "I'm watching this" — same guard as
   // watchlistInteractedRef, so a slow best-effort seed lookup can't clobber it.
   const trackInteractedRef = useRef(false);
+  // Synchronous mirror of `watched`, same reasoning as trackedRef.
+  const watchedRef = useRef(false);
+  // Set once the user taps "Mark as watched" (films) — same guard shape as
+  // trackInteractedRef.
+  const watchInteractedRef = useRef(false);
   const confirmationTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   // Guards loadWatches against a stale response clobbering a newer one (e.g.
   // tmdbId/mediaType changing quickly, or an edit-triggered refetch racing a
@@ -242,12 +259,27 @@ export default function TitleDetailScreen({ route, navigation }: Props) {
   // watchlist seed lookup above, same guard shape (skip if unmounted or if
   // the user has already tapped "I'm watching this").
   useEffect(() => {
+    if (mediaType !== 'tv') return;
     getTrackedKeys([{ tmdbId, mediaType }])
       .then((keys) => {
         if (!mountedRef.current || trackInteractedRef.current) return;
         const next = keys.has(watchlistKey(tmdbId, mediaType));
         trackedRef.current = next;
         setTracked(next);
+      })
+      .catch(() => {});
+  }, [tmdbId, mediaType]);
+
+  // Best-effort initial watched state, films only — sibling to the tracked
+  // seed lookup above, same guard shape (skip if unmounted or already tapped).
+  useEffect(() => {
+    if (mediaType !== 'movie') return;
+    getLoggedKeys([{ tmdbId, mediaType }])
+      .then((keys) => {
+        if (!mountedRef.current || watchInteractedRef.current) return;
+        const next = keys.has(watchKey(tmdbId, mediaType));
+        watchedRef.current = next;
+        setWatched(next);
       })
       .catch(() => {});
   }, [tmdbId, mediaType]);
@@ -276,6 +308,33 @@ export default function TitleDetailScreen({ route, navigation }: Props) {
         showConfirmation(COPY_SAVE_FAILED);
       });
   }, [tmdbId, mediaType, showConfirmation]);
+
+  // Tap "Mark as watched" (films): optimistic flip + logWatch, roll back on
+  // failure. Unlike handleTrackShow this logs a real `watches` row (the same
+  // primitive as the Home/Add "✓ Watched" actions), so a success also
+  // refreshes "Your watches" below — the new watch should appear immediately,
+  // not just on the next focus.
+  const handleMarkWatched = useCallback(() => {
+    if (watchedRef.current) return;
+    watchInteractedRef.current = true;
+    watchedRef.current = true;
+    setWatched(true);
+    logWatch({ tmdbId, mediaType })
+      .then(() => {
+        if (!mountedRef.current) return;
+        showConfirmation(COPY_WATCHED);
+        loadWatches();
+      })
+      .catch((err) => {
+        console.warn('mark watched failed', err);
+        if (!mountedRef.current) return;
+        if (watchedRef.current) {
+          watchedRef.current = false;
+          setWatched(false);
+        }
+        showConfirmation(COPY_SAVE_FAILED);
+      });
+  }, [tmdbId, mediaType, showConfirmation, loadWatches]);
 
   // Tap ❤️: optimistic flip + persist, roll back on failure (mirrors AddScreen).
   // `desired` is read from the ref (synchronous truth) so a same-frame double-tap
@@ -386,32 +445,60 @@ export default function TitleDetailScreen({ route, navigation }: Props) {
                   {watchlisted ? 'On your watchlist' : 'Add to watchlist'}
                 </Text>
               </Pressable>
-              {/* "I'm watching this" (Story 3.1) — second action row below the
-                  ❤️ button. No untrack path (AC4): once tracked, a further tap
-                  is a no-op (handleTrackShow's own guard, plus 0006's DB-level
-                  guarantee). Reachable in the same states as the watchlist
-                  heart (loaded + soft-fallback, never hard-error). No episode-
-                  state badge here (scope wall) — this story only tracks. */}
-              <Pressable
-                onPress={handleTrackShow}
-                disabled={tracked}
-                style={({ pressed }) => [styles.watchlistButton, pressed && !tracked && styles.watchlistButtonPressed]}
-                hitSlop={8}
-                accessibilityRole="button"
-                accessibilityState={{ disabled: tracked }}
-                accessibilityLabel={
-                  tracked ? `${detail.title} is being tracked` : `Start tracking ${detail.title}`
-                }
-              >
-                <Ionicons
-                  name={tracked ? 'checkmark-circle' : 'add-circle-outline'}
-                  size={24}
-                  color={theme.colors.primary}
-                />
-                <Text style={styles.watchlistLabel}>
-                  {tracked ? 'Tracking' : "I'm watching this"}
-                </Text>
-              </Pressable>
+              {/* TV: "I'm watching this" (Story 3.1) — second action row below
+                  the ❤️ button. No untrack path (AC4): once tracked, a further
+                  tap is a no-op (handleTrackShow's own guard, plus 0006's
+                  DB-level guarantee). A show has an ongoing "next episode" to
+                  track, which is what this button seeds. */}
+              {detail.mediaType === 'tv' && (
+                <Pressable
+                  onPress={handleTrackShow}
+                  disabled={tracked}
+                  style={({ pressed }) => [styles.watchlistButton, pressed && !tracked && styles.watchlistButtonPressed]}
+                  hitSlop={8}
+                  accessibilityRole="button"
+                  accessibilityState={{ disabled: tracked }}
+                  accessibilityLabel={
+                    tracked ? `${detail.title} is being tracked` : `Start tracking ${detail.title}`
+                  }
+                >
+                  <Ionicons
+                    name={tracked ? 'checkmark-circle' : 'add-circle-outline'}
+                    size={24}
+                    color={theme.colors.primary}
+                  />
+                  <Text style={styles.watchlistLabel}>
+                    {tracked ? 'Tracking' : "I'm watching this"}
+                  </Text>
+                </Pressable>
+              )}
+              {/* Films: "Mark as watched" — a film has no ongoing progress to
+                  track, so this logs a real `watches` row directly (the same
+                  primitive as Home/Add's "✓ Watched") rather than seeding a
+                  `tracked_shows` row that would be meaningless for a film
+                  (0006: `next_episode_pointer` is permanently null for films). */}
+              {detail.mediaType === 'movie' && (
+                <Pressable
+                  onPress={handleMarkWatched}
+                  disabled={watched}
+                  style={({ pressed }) => [styles.watchlistButton, pressed && !watched && styles.watchlistButtonPressed]}
+                  hitSlop={8}
+                  accessibilityRole="button"
+                  accessibilityState={{ disabled: watched }}
+                  accessibilityLabel={
+                    watched ? `${detail.title} is marked as watched` : `Mark ${detail.title} as watched`
+                  }
+                >
+                  <Ionicons
+                    name={watched ? 'checkmark-circle' : 'add-circle-outline'}
+                    size={24}
+                    color={theme.colors.primary}
+                  />
+                  <Text style={styles.watchlistLabel}>
+                    {watched ? 'Watched' : 'Mark as watched'}
+                  </Text>
+                </Pressable>
+              )}
               {confirmation && (
                 <Text
                   style={styles.watchlistConfirmation}

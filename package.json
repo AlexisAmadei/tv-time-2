@@ -15,6 +15,7 @@
     "app": "pnpm --filter popcorn-time start",
     "verify": "node scripts/smoke-check.mjs",
     "build:android": "pnpm --dir app exec eas build --platform android --profile production",
+    "build:android-dev": "pnpm --dir app exec eas build --platform android --profile preview",
     "build:ios": "pnpm --dir app exec eas build --platform ios --profile production"
   }
 }
