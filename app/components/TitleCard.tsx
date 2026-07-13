@@ -345,6 +345,112 @@ export function TitleCard({
   );
 }
 
+/**
+ * Grid/card view of a title — poster-forward, 3-per-row layout (HomeScreen's
+ * list⇄grid toggle). Unlike TitleCard's horizontal row, the poster IS the
+ * card; title/meta sit below it. `posterWidth` is measured by the caller
+ * (grid columns are computed from the available row width, not fixed), with
+ * height derived from the same 2:3 poster aspect ratio Poster's defaults use
+ * (CARD_POSTER_W:CARD_POSTER_H). Carries the same onPress/onMarkWatched
+ * affordances as TitleCard so grid view has no functional gap vs list view —
+ * the watched control becomes a small corner badge instead of the pill/icon
+ * row (there's no room for a second row of controls at this card size).
+ */
+export function GridPosterCard({
+  item,
+  posterWidth,
+  onPress,
+  onMarkWatched,
+  watchedPending = false,
+  watchedAlready = false,
+  episodesWatched = null,
+  episodesTotal = null,
+}: {
+  item: CatalogResult;
+  posterWidth: number;
+  onPress?: (item: CatalogResult) => void;
+  onMarkWatched?: (item: CatalogResult) => void;
+  watchedPending?: boolean;
+  watchedAlready?: boolean;
+  // Series only (tv) — real episodes watched / total real episodes, specials
+  // excluded (computed by the caller, HomeScreen's countRealEpisodes /
+  // countWatchedRealEpisodes). Either null ⇒ no bar rendered: null total means
+  // "not tv" or "not resolved yet", and a 0-episode show has nothing to show
+  // progress against.
+  episodesWatched?: number | null;
+  episodesTotal?: number | null;
+}) {
+  const theme = useTheme();
+  const styles = makeStyles(theme);
+  const posterHeight = posterWidth * (CARD_POSTER_H / CARD_POSTER_W);
+
+  const typeLabel = item.mediaType === 'tv' ? 'TV' : 'Film';
+  const meta = [item.year, typeLabel].filter(Boolean).join(' · ');
+  const [confirmed, setConfirmed] = useState(watchedAlready);
+
+  function handleMarkWatchedPress() {
+    if (!onMarkWatched) return;
+    onMarkWatched(item);
+    setConfirmed(true);
+  }
+
+  // Bar renders only once there's a real denominator to show — a 0-episode
+  // total (not-yet-aired show, or metadata gap) has no meaningful fraction.
+  const showProgress = item.mediaType === 'tv' && !!episodesTotal && episodesTotal > 0;
+  const progressPct = showProgress
+    ? Math.max(0, Math.min(100, ((episodesWatched ?? 0) / episodesTotal!) * 100))
+    : 0;
+
+  return (
+    <Pressable
+      style={({ pressed }) => [styles.gridCard, { width: posterWidth }, pressed && onPress && styles.cardPressed]}
+      onPress={onPress ? () => onPress(item) : undefined}
+      disabled={!onPress}
+      accessibilityRole={onPress ? 'button' : undefined}
+      accessible
+      accessibilityLabel={`${item.title}, ${item.year ?? 'year unknown'}, ${typeLabel}${
+        showProgress ? `, ${episodesWatched ?? 0} of ${episodesTotal} episodes watched` : ''
+      }`}
+    >
+      <View>
+        <Poster posterPath={item.posterPath} width={posterWidth} height={posterHeight} glyphSize={28} />
+        {showProgress && (
+          <View style={styles.gridProgressTrack} pointerEvents="none">
+            <View style={[styles.gridProgressFill, { width: `${progressPct}%` }]} />
+          </View>
+        )}
+        {onMarkWatched && (
+          <Pressable
+            onPress={handleMarkWatchedPress}
+            disabled={watchedPending}
+            style={({ pressed }) => [styles.gridWatchedBadge, pressed && styles.iconButtonPressed]}
+            hitSlop={8}
+            accessibilityRole="button"
+            accessibilityState={{ disabled: watchedPending }}
+            accessibilityLabel={
+              watchedPending
+                ? `${item.title} marked watched`
+                : watchedAlready
+                  ? `Log another watch of ${item.title}`
+                  : `Mark ${item.title} watched`
+            }
+          >
+            <Ionicons
+              name="checkmark-circle"
+              size={22}
+              color={confirmed ? theme.colors.success : theme.colors.surfaceRaised}
+            />
+          </Pressable>
+        )}
+      </View>
+      <Text style={styles.gridCardTitle} numberOfLines={2}>
+        {item.title}
+      </Text>
+      <Text style={styles.cardMeta}>{meta}</Text>
+    </Pressable>
+  );
+}
+
 const styles = StyleSheet.create({
   placeholderCenter: { alignItems: 'center', justifyContent: 'center' },
   // A small, muted glyph centered in the placeholder — never color-only signal.
@@ -424,5 +530,41 @@ function makeStyles(theme: Theme) {
     cardTitle: { ...type.cardTitle, color: colors.inkPrimary },
     cardSubtitle: { ...type.meta, color: colors.primary },
     cardMeta: { ...type.meta, color: colors.inkSecondary },
+    gridCard: { gap: spacing.xs },
+    gridCardTitle: { ...type.label, color: colors.inkPrimary },
+    // Bottom-edge progress bar (grid view, tv only) — sits flush against the
+    // poster's bottom edge/corners so it reads as part of the poster (mirrors
+    // the streaming-app "continue watching" bar convention) rather than a
+    // separate element floating below it.
+    gridProgressTrack: {
+      position: 'absolute',
+      bottom: 0,
+      left: 0,
+      right: 0,
+      height: 4,
+      backgroundColor: 'rgba(0,0,0,0.45)',
+      borderBottomLeftRadius: radius.sm,
+      borderBottomRightRadius: radius.sm,
+      overflow: 'hidden',
+    },
+    gridProgressFill: {
+      height: '100%',
+      backgroundColor: colors.primary,
+    },
+    // Small overlay badge (grid view only) — sits at the poster's corner since
+    // there's no room for a second control row at this card size (see
+    // GridPosterCard doc comment). backgroundColor is a translucent scrim so
+    // the checkmark reads against any poster art.
+    gridWatchedBadge: {
+      position: 'absolute',
+      top: spacing.xs,
+      right: spacing.xs,
+      width: 28,
+      height: 28,
+      borderRadius: radius.pill,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: 'rgba(0,0,0,0.45)',
+    },
   });
 }

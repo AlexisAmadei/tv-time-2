@@ -39,13 +39,13 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
 import RatingPrompt from '../../components/RatingPrompt';
 import { Screen } from '../../components/Screen';
-import { TitleCard } from '../../components/TitleCard';
+import { GridPosterCard, TitleCard } from '../../components/TitleCard';
 import { useTheme } from '../../theme/ThemeProvider';
 import type { Theme } from '../../theme/tokens';
 import { fetchTitleDetail, type CatalogResult, type TitleDetail } from '../../data/catalog';
 import { getWatchlist } from '../../data/watchlist';
 import { getTrackedShows } from '../../data/trackedShows';
-import { getLoggedKeys, logWatch, watchKey } from '../../data/watchLog';
+import { getLoggedKeys, getWatchedEpisodeIds, logWatch, watchKey } from '../../data/watchLog';
 import { triggerSync } from '../../data/watchSync';
 import type { HomeStackParamList } from '../../navigation/HomeStack';
 
@@ -67,6 +67,19 @@ interface UpNextItem extends CatalogResult {
   // and for a tv show whose pointer is null (brand-new/caught-up) or whose
   // matching episode isn't present in the fetched seasons.
   nextEpisodeLabel: string | null;
+  // Grid-view-only progress bar (real episodes watched / total real episodes,
+  // specials excluded — see countRealEpisodes/countWatchedRealEpisodes). Null
+  // for films and for a tv item whose progress hasn't resolved yet.
+  episodesWatched: number | null;
+  episodesTotal: number | null;
+}
+
+/** Watchlist shelf items also carry the same tv-only progress fields as
+ *  {@link UpNextItem} (added by this story) — the grid progress bar isn't
+ *  Up-Next-exclusive, it renders on every tv card in grid view. */
+interface WatchlistCardItem extends CatalogResult {
+  episodesWatched: number | null;
+  episodesTotal: number | null;
 }
 
 /** Find the season/episode-number label for a TMDB episode id inside a
@@ -87,6 +100,32 @@ function findNextEpisodeLabel(
   return null;
 }
 
+// Season 0 is TMDB's "Specials" bucket (no explicit flag on season/episode —
+// see catalog-title's passthrough) and must never count toward the grid-view
+// progress bar's denominator or numerator (per this story's requirement:
+// "real episodes only, not specials").
+function countRealEpisodes(seasons: TitleDetail['seasons']): number {
+  if (!seasons) return 0;
+  return seasons
+    .filter((s) => s.seasonNumber !== 0)
+    .reduce((sum, s) => sum + s.episodes.length, 0);
+}
+
+function countWatchedRealEpisodes(
+  seasons: TitleDetail['seasons'],
+  watchedEpisodeIds: Set<number>,
+): number {
+  if (!seasons) return 0;
+  let count = 0;
+  for (const season of seasons) {
+    if (season.seasonNumber === 0) continue;
+    for (const episode of season.episodes) {
+      if (watchedEpisodeIds.has(episode.tmdbEpisodeId)) count += 1;
+    }
+  }
+  return count;
+}
+
 // AC2's (2.4) verbatim warm empty-watchlist copy (EXPERIENCE.md#Empty Watchlist).
 const COPY_WATCHLIST_EMPTY = 'Save something for later — tap ❤️ on any title.';
 // Up Next's own empty-shelf copy (Story 3.1) — no AC/EXPERIENCE.md row
@@ -102,6 +141,13 @@ const COPY_HOME_EMPTY = 'Your story starts here. What did you watch tonight?';
 const COPY_ERROR = "We couldn't load this right now.";
 
 const SHELF_CARD_WIDTH = 280;
+
+// List⇄grid toggle: grid view is a fixed 3-per-row layout (posters as the
+// primary content, mirrors common streaming-app "card view" patterns) rather
+// than list view's 1-per-row full-width rows.
+const GRID_COLUMNS = 3;
+
+type ViewMode = 'list' | 'grid';
 
 // Series/Movies tabs — swipeable, mirrors the native tab-bar pattern (tap OR
 // horizontal swipe). No pager library is installed and this app is pinned to
@@ -122,6 +168,9 @@ export default function HomeScreen({ navigation }: Props) {
   const styles = makeStyles(theme);
 
   const [activeTab, setActiveTab] = useState<'tv' | 'movie'>('tv');
+  // Applies to both Series and Movies tabs — one toggle, not per-tab, so
+  // switching tabs doesn't surprise the user with a different layout.
+  const [viewMode, setViewMode] = useState<ViewMode>('list');
   const tabScrollRef = useRef<ScrollView>(null);
   // Screen (see components/Screen.tsx) applies its own horizontal margin, so
   // the pager's usable width is that inner content box, not the raw window
@@ -166,8 +215,8 @@ export default function HomeScreen({ navigation }: Props) {
   const [trackedPhase, setTrackedPhase] = useState<Phase>('loading');
   const [trackedItems, setTrackedItems] = useState<UpNextItem[]>([]);
   const [watchlistPhase, setWatchlistPhase] = useState<Phase>('loading');
-  const [watchlistItems, setWatchlistItems] = useState<CatalogResult[]>([]);
-  const [watchedWatchlistItems, setWatchedWatchlistItems] = useState<CatalogResult[]>([]);
+  const [watchlistItems, setWatchlistItems] = useState<WatchlistCardItem[]>([]);
+  const [watchedWatchlistItems, setWatchedWatchlistItems] = useState<WatchlistCardItem[]>([]);
 
   // ✓ Watched (Story 3.2) local UI state — per-key pending set, owned entirely
   // by handleMarkWatched's own call (added at the start of its flow, cleared
@@ -228,9 +277,15 @@ export default function HomeScreen({ navigation }: Props) {
       );
       if (!mountedRef.current || seq !== trackedRequestSeq.current) return; // superseded
       const resolved: UpNextItem[] = [];
+      // Keyed alongside `resolved` so the post-hoc watched-episode-ids pass
+      // below can re-derive each tv item's denominator without re-fetching
+      // detail (seasons already live here from the settled Promise.allSettled
+      // above — CatalogResult itself doesn't carry them).
+      const seasonsByTmdbId = new Map<number, TitleDetail['seasons']>();
       settled.forEach((result, i) => {
         if (result.status === 'fulfilled') {
           const { detail } = result.value;
+          if (detail.mediaType === 'tv') seasonsByTmdbId.set(detail.tmdbId, detail.seasons);
           resolved.push({
             tmdbId: detail.tmdbId,
             mediaType: detail.mediaType,
@@ -246,6 +301,8 @@ export default function HomeScreen({ navigation }: Props) {
             // shows fall back to null (Shelf then falls back to the plain
             // title card with no subtitle).
             nextEpisodeLabel: findNextEpisodeLabel(detail.seasons, rows[i].nextEpisodePointer),
+            episodesWatched: null,
+            episodesTotal: detail.mediaType === 'tv' ? countRealEpisodes(detail.seasons) : null,
           });
         } else {
           // One title's metadata is unavailable — drop that card, don't block
@@ -266,7 +323,19 @@ export default function HomeScreen({ navigation }: Props) {
       // the source. TV shows are unaffected: their own watched/caught-up state
       // is already expressed through `nextEpisodePointer`, not this check.
       const loggedKeys = await getLoggedKeys(resolved);
+      // Grid-view progress bar's numerator — batched over every tv title in
+      // this shelf rather than one query per card.
+      const watchedEpisodeIds = await getWatchedEpisodeIds(
+        resolved.filter((item) => item.mediaType === 'tv').map((item) => item.tmdbId),
+      );
       if (!mountedRef.current || seq !== trackedRequestSeq.current) return; // superseded
+      for (const item of resolved) {
+        if (item.mediaType !== 'tv') continue;
+        item.episodesWatched = countWatchedRealEpisodes(
+          seasonsByTmdbId.get(item.tmdbId),
+          watchedEpisodeIds.get(item.tmdbId) ?? new Set(),
+        );
+      }
       const visible = resolved.filter(
         (item) => item.mediaType !== 'movie' || !loggedKeys.has(watchKey(item.tmdbId, item.mediaType)),
       );
@@ -289,16 +358,20 @@ export default function HomeScreen({ navigation }: Props) {
         rows.map((row) => fetchTitleDetail(row.tmdbId, row.mediaType)),
       );
       if (!mountedRef.current || seq !== watchlistRequestSeq.current) return; // superseded
-      const resolved: CatalogResult[] = [];
+      const resolved: WatchlistCardItem[] = [];
+      const seasonsByTmdbId = new Map<number, TitleDetail['seasons']>();
       settled.forEach((result, i) => {
         if (result.status === 'fulfilled') {
           const { detail } = result.value;
+          if (detail.mediaType === 'tv') seasonsByTmdbId.set(detail.tmdbId, detail.seasons);
           resolved.push({
             tmdbId: detail.tmdbId,
             mediaType: detail.mediaType,
             title: detail.title,
             year: detail.year,
             posterPath: detail.posterPath,
+            episodesWatched: null,
+            episodesTotal: detail.mediaType === 'tv' ? countRealEpisodes(detail.seasons) : null,
           });
         } else {
           console.warn('watchlist shelf: failed to resolve title', rows[i], result.reason);
@@ -309,8 +382,21 @@ export default function HomeScreen({ navigation }: Props) {
         return;
       }
       const loggedKeys = await getLoggedKeys(resolved);
-      const unwatched: CatalogResult[] = [];
-      const watched: CatalogResult[] = [];
+      // Grid-view progress bar's numerator, batched (see loadTracked's
+      // identical pattern).
+      const watchedEpisodeIds = await getWatchedEpisodeIds(
+        resolved.filter((item) => item.mediaType === 'tv').map((item) => item.tmdbId),
+      );
+      if (!mountedRef.current || seq !== watchlistRequestSeq.current) return; // superseded
+      for (const item of resolved) {
+        if (item.mediaType !== 'tv') continue;
+        item.episodesWatched = countWatchedRealEpisodes(
+          seasonsByTmdbId.get(item.tmdbId),
+          watchedEpisodeIds.get(item.tmdbId) ?? new Set(),
+        );
+      }
+      const unwatched: WatchlistCardItem[] = [];
+      const watched: WatchlistCardItem[] = [];
       resolved.forEach((item) => {
         const key = watchKey(item.tmdbId, item.mediaType);
         if (loggedKeys.has(key)) {
@@ -452,23 +538,38 @@ export default function HomeScreen({ navigation }: Props) {
 
   return (
     <Screen>
-      <View style={styles.tabBar} accessibilityRole="tablist">
-        {MEDIA_TABS.map((tab) => {
-          const isActive = tab.key === activeTab;
-          return (
-            <Pressable
-              key={tab.key}
-              onPress={() => handleTabPress(tab.key)}
-              style={styles.tabButton}
-              accessibilityRole="tab"
-              accessibilityState={{ selected: isActive }}
-              accessibilityLabel={tab.label}
-            >
-              <Text style={[styles.tabLabel, isActive && styles.tabLabelActive]}>{tab.label}</Text>
-              <View style={[styles.tabIndicator, isActive && styles.tabIndicatorActive]} />
-            </Pressable>
-          );
-        })}
+      <View style={styles.headerRow}>
+        <View style={styles.tabBar} accessibilityRole="tablist">
+          {MEDIA_TABS.map((tab) => {
+            const isActive = tab.key === activeTab;
+            return (
+              <Pressable
+                key={tab.key}
+                onPress={() => handleTabPress(tab.key)}
+                style={styles.tabButton}
+                accessibilityRole="tab"
+                accessibilityState={{ selected: isActive }}
+                accessibilityLabel={tab.label}
+              >
+                <Text style={[styles.tabLabel, isActive && styles.tabLabelActive]}>{tab.label}</Text>
+                <View style={[styles.tabIndicator, isActive && styles.tabIndicatorActive]} />
+              </Pressable>
+            );
+          })}
+        </View>
+        <Pressable
+          onPress={() => setViewMode((v) => (v === 'list' ? 'grid' : 'list'))}
+          style={styles.viewToggleButton}
+          hitSlop={8}
+          accessibilityRole="button"
+          accessibilityLabel={viewMode === 'list' ? 'Switch to grid view' : 'Switch to list view'}
+        >
+          <Ionicons
+            name={viewMode === 'list' ? 'grid-outline' : 'list-outline'}
+            size={22}
+            color={theme.colors.inkSecondary}
+          />
+        </Pressable>
       </View>
 
       {confirmation && (
@@ -500,6 +601,8 @@ export default function HomeScreen({ navigation }: Props) {
                 items={trackedByTab[tab.key]}
                 emptyCopy={COPY_UP_NEXT_EMPTY}
                 horizontal={false}
+                viewMode={viewMode}
+                pagerWidth={pagerWidth}
                 onRetry={loadTracked}
                 onOpenDetail={handleOpenDetail}
                 onMarkWatched={handleMarkWatched}
@@ -515,8 +618,13 @@ export default function HomeScreen({ navigation }: Props) {
               items={watchlistByTab[tab.key]}
               emptyCopy={COPY_WATCHLIST_EMPTY}
               horizontal={false}
+              viewMode={viewMode}
+              pagerWidth={pagerWidth}
               onRetry={loadWatchlist}
               onOpenDetail={handleOpenDetail}
+              onMarkWatched={tab.key === 'movie' ? handleMarkWatched : undefined}
+              watchedPendingKeys={watchedPendingKeys}
+              watchedIcon={tab.key === 'movie'}
               theme={theme}
               styles={styles}
             />
@@ -529,6 +637,8 @@ export default function HomeScreen({ navigation }: Props) {
                 accordion
                 defaultExpanded={false}
                 horizontal={false}
+                viewMode={viewMode}
+                pagerWidth={pagerWidth}
                 onRetry={loadWatchlist}
                 onOpenDetail={handleOpenDetail}
                 onMarkWatched={handleMarkWatched}
@@ -560,6 +670,8 @@ function Shelf({
   emptyCopy,
   collapsedCopy,
   horizontal,
+  viewMode,
+  pagerWidth,
   accordion = false,
   defaultExpanded = true,
   onRetry,
@@ -579,6 +691,14 @@ function Shelf({
   emptyCopy?: string;
   collapsedCopy?: string;
   horizontal: boolean;
+  // 'grid' switches this shelf's list to the 3-per-row poster layout
+  // (HomeScreen's list⇄grid toggle) — applies to every shelf uniformly, same
+  // as list view today. `pagerWidth` (the pager's measured page width — see
+  // HomeScreen's onLayout) sizes each grid column, since GridPosterCard needs
+  // a pixel poster width rather than a percentage (Poster only accepts
+  // numeric width/height).
+  viewMode: ViewMode;
+  pagerWidth: number;
   accordion?: boolean;
   defaultExpanded?: boolean;
   onRetry: () => void;
@@ -659,9 +779,53 @@ function Shelf({
         <Text style={styles.collapsedStateText}>{collapsedCopy ?? 'Tap to expand.'}</Text>
       )}
 
-      {phase === 'loaded' && showList && items.length > 0 && (
+      {phase === 'loaded' && showList && items.length > 0 && viewMode === 'grid' && (
         <FlatList
           data={items}
+          key="grid" // numColumns can't change on a live FlatList — force remount vs the list-mode instance
+          numColumns={GRID_COLUMNS}
+          // Same reasoning as the list-mode FlatList below (scrollEnabled=
+          // {horizontal}, false here too): the outer pageScroll ScrollView
+          // owns scrolling for this page, so this nested list must not also
+          // scroll — RN's "VirtualizedLists should never be nested inside
+          // plain ScrollViews with the same orientation" warning is exactly
+          // this case when a nested list DOES keep its own scroll enabled.
+          scrollEnabled={false}
+          showsVerticalScrollIndicator={false}
+          keyExtractor={(item) => `${item.mediaType}:${item.tmdbId}`}
+          columnWrapperStyle={styles.gridRow}
+          renderItem={({ item }) => {
+            const upNextItem = item as Partial<UpNextItem>;
+            const showWatchedPill =
+              !!onMarkWatched &&
+              (item.mediaType === 'movie' ||
+                (item.mediaType === 'tv' && upNextItem.nextEpisodePointer != null));
+            const key = watchKey(item.tmdbId, item.mediaType);
+            const gap = theme.spacing.sm;
+            const posterWidth = pagerWidth
+              ? (pagerWidth - gap * (GRID_COLUMNS - 1)) / GRID_COLUMNS
+              : 100;
+            return (
+              <GridPosterCard
+                item={item}
+                posterWidth={posterWidth}
+                onPress={onOpenDetail}
+                onMarkWatched={showWatchedPill ? onMarkWatched : undefined}
+                watchedPending={watchedPendingKeys?.has(key) ?? false}
+                watchedAlready={watchedAlready}
+                episodesWatched={upNextItem.episodesWatched ?? null}
+                episodesTotal={upNextItem.episodesTotal ?? null}
+              />
+            );
+          }}
+          contentContainerStyle={styles.shelfContentGrid}
+        />
+      )}
+
+      {phase === 'loaded' && showList && items.length > 0 && viewMode === 'list' && (
+        <FlatList
+          data={items}
+          key="list"
           horizontal={horizontal}
           scrollEnabled={horizontal}
           showsHorizontalScrollIndicator={horizontal}
@@ -709,10 +873,21 @@ function makeStyles(theme: Theme) {
       color: colors.inkSecondary,
       marginBottom: spacing.sm,
     },
-    tabBar: {
+    headerRow: {
       flexDirection: 'row',
+      alignItems: 'center',
       borderBottomWidth: StyleSheet.hairlineWidth,
       borderBottomColor: colors.borderHairline,
+    },
+    tabBar: {
+      flex: 1,
+      flexDirection: 'row',
+    },
+    viewToggleButton: {
+      width: 44,
+      height: 44,
+      alignItems: 'center',
+      justifyContent: 'center',
     },
     tabButton: {
       flex: 1,
@@ -777,6 +952,8 @@ function makeStyles(theme: Theme) {
     retryText: { ...type.label, color: colors.inkPrimary },
     shelfContentHorizontal: { paddingBottom: spacing.xl },
     shelfContentVertical: { paddingBottom: spacing.xl, gap: spacing.md },
+    shelfContentGrid: { paddingBottom: spacing.xl, gap: spacing.sm },
+    gridRow: { gap: spacing.sm, marginBottom: spacing.sm },
     shelfCardHorizontal: { width: SHELF_CARD_WIDTH, marginRight: spacing.md },
     shelfCardVertical: { width: '100%' },
   });

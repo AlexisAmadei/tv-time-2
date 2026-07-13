@@ -358,3 +358,69 @@ export async function getLoggedKeys(
   // back down to the exact (tmdbId, mediaType) pairs actually requested.
   return new Set([...logged].filter((k) => requested.has(k)));
 }
+
+/**
+ * Per-episode watched ids for a batch of tv shows — the granularity
+ * {@link getLoggedKeys} deliberately doesn't provide (that one only answers
+ * "has ANY watch been logged for this title"). Used by HomeScreen's grid-view
+ * progress bar (episodes watched / total real episodes). Mirrors
+ * getLoggedKeys's exact shape: local `pending_watches` (unsynced) unioned with
+ * the server `watches` table (synced), best-effort on the server leg so a
+ * hung/failed query degrades to local-only rather than throwing away what's
+ * already known.
+ */
+export async function getWatchedEpisodeIds(
+  tmdbIds: number[],
+): Promise<Map<number, Set<number>>> {
+  const result = new Map<number, Set<number>>();
+  if (tmdbIds.length === 0) return result;
+  const ids = [...new Set(tmdbIds)];
+
+  const add = (tmdbId: number, episodeId: number) => {
+    const set = result.get(tmdbId) ?? new Set<number>();
+    set.add(episodeId);
+    result.set(tmdbId, set);
+  };
+
+  // No session → degrade to no progress rather than surface another account's
+  // local outbox rows (same reasoning as getLoggedKeys).
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
+  if (!session) return result;
+
+  const db = await getDb();
+  const placeholders = ids.map(() => '?').join(',');
+  const localRows = await db.getAllAsync<{ tmdb_id: number; tmdb_episode_id: number | null }>(
+    `select tmdb_id, tmdb_episode_id from pending_watches
+     where user_id = ? and media_type = 'tv' and tmdb_episode_id is not null and tmdb_id in (${placeholders})`,
+    [session.user.id, ...ids],
+  );
+  for (const row of localRows) {
+    if (row.tmdb_episode_id != null) add(row.tmdb_id, row.tmdb_episode_id);
+  }
+
+  try {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), LOGGED_KEYS_TIMEOUT_MS);
+    try {
+      const { data } = await supabase
+        .from('watches')
+        .select('tmdb_id, tmdb_episode_id')
+        .eq('user_id', session.user.id)
+        .eq('media_type', 'tv')
+        .not('tmdb_episode_id', 'is', null)
+        .in('tmdb_id', ids)
+        .abortSignal(controller.signal);
+      for (const row of data ?? []) {
+        if (row.tmdb_episode_id != null) add(row.tmdb_id, row.tmdb_episode_id);
+      }
+    } finally {
+      clearTimeout(timer);
+    }
+  } catch {
+    // best-effort — leave the local-only ids as-is
+  }
+
+  return result;
+}
