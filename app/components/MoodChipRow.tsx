@@ -1,16 +1,4 @@
-// Shared mood-chip row (Story 3.5, extracted from BulkLogSheet — see
-// StarRating.tsx for the same 3.4→3.5 deferral note).
-//
-// Renders the FR18 locked set (MOODS, canonical order) as pill chips.
-// Selection rules, generalized from 3.4's single-select radio to an N-select:
-//   - tapping a selected chip deselects it;
-//   - tapping an unselected chip when already at `max` replaces the OLDEST
-//     selection (so a max={1} row is exactly 3.4's radio behavior, and a
-//     max={2} row never dead-ends the user into having to deselect first).
-//
-// DESIGN.md#Components: pill, single emoji, selected = filled surface-sunken.
-// Each chip announces its NAME to screen readers, never the bare emoji
-// (UX-DR23, AC6).
+// Each chip announces its NAME to screen readers, never the bare emoji (UX-DR23, AC6).
 
 import { StyleSheet, Pressable, Text, View } from 'react-native';
 

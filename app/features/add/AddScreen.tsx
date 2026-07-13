@@ -1,21 +1,3 @@
-// Add — the (+) target, the search-first entry to logging (Story 1.4 search,
-// Story 1.5 logging).
-//
-// Search a real title through the proxied catalog. This screen owns the debounce
-// that keeps TMDB from being hammered per keystroke (FR6 "results appear as you
-// type" without the anti-goal). Each result carries a dedicated log icon button
-// (checkmark) that commits a watch immediately — the walking-skeleton log
-// action (Story 1.5, AC2/AC6) that lifts 1.4's "results are inert" scope wall.
-// The row itself stays inert (reserved for Epic 2's title-detail navigation).
-// No episode/season picker, no rating/mood/note prompt — those are Epic 3.
-//
-// The soft confirmation is a bottom toast (slide up + fade, RN's built-in
-// Animated — Reduce Motion shows/hides it directly instead).
-//
-// Errors preserve the typed query (AC6/FR8) and show the warm retry copy; a
-// missing/failed poster shows the cool→dark placeholder, never a broken image
-// (FR9). All color/typography comes from theme roles — no literal hex (UX-DR1).
-
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   AccessibilityInfo,

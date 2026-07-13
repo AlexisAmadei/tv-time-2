@@ -1,7 +1,3 @@
-// Recommendations-tab stack navigator — mirrors HomeStack.tsx: the tab needs
-// to push title detail from a tapped card, so it gets its own tiny stack
-// instead of being a bare tab.
-
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 
 import RecommendationsScreen from '../features/recommendations/RecommendationsScreen';

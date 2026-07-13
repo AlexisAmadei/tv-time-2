@@ -1,17 +1,3 @@
-// Title detail (Story 2.2) — poster, synopsis, year, and (for shows) seasons +
-// episodes. Opened by tapping a title card (AddScreen today; more surfaces
-// later). Display-only per the story's scope wall: no tracking / watchlist /
-// rating / notify — those are later epics. A gap is intentionally left where
-// 2.3's ❤️ Add-to-Watchlist button will land.
-//
-// Three real states, all first-class (EXPERIENCE.md review-rubric flagged the
-// loading + error triad as previously underspecified):
-//   * loading  — spinner while catalog-title resolves,
-//   * loaded   — poster/title/year/synopsis (+ seasons for tv),
-//   * error    — AC4's two cases: (a) cached basics available → render them with
-//                a "showing saved info" note; (b) nothing cached → the verbatim
-//                "We couldn't load this right now." + retry.
-
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,

@@ -1,9 +1,3 @@
-// Recommendations tab — an endless, non-personalized feed proxied through the
-// `catalog-recommendations` Edge Function (TMDB /discover, popularity-sorted,
-// paged), split into Series/Movies tabs. Mirrors HomeScreen's swipeable
-// MEDIA_TABS pager and the recs-shelf's load/dedupe/❤️-toggle logic, but each
-// tab now paginates independently via FlatList's onEndReached.
-
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   AccessibilityInfo,

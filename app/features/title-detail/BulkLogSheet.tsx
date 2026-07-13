@@ -1,24 +1,3 @@
-// Bulk-log sheet (Story 3.4) — "Mark whole season watched" on a season row
-// opens this, with every episode pre-checked (AC1 — "deselect, don't
-// select"). Confirm commits the whole selection as one atomic local-outbox
-// transaction via `logWatchBatch()` (one session lookup, one
-// `withTransactionAsync`, one `triggerSync()` — not N of each), so a failure
-// partway through never leaves a partial batch to half-retry.
-//
-// First bottom-sheet/modal in the codebase: React Native's built-in `Modal`
-// (transparent + slide animation), no new dependency.
-//
-// Season-level rating/mood (AC3) is a SEPARATE, minimal, self-contained
-// control — NOT Story 3.5's post-watch prompt (a 0–2 multi-select mood sheet
-// that slides up after a *single* watch). This is one optional 0–5 half-star
-// rating and at most one optional mood chip, applied identically to every
-// episode this bulk action logs; the bulk path fires no post-watch prompt.
-//
-// The shared StarRating/MoodChipRow extraction this file's 3.4 header deferred
-// to 3.5 has now happened — this file consumes both (a `max={1}` MoodChipRow is
-// exactly 3.4's single-select radio), with identical behavior. No multi-mood
-// selector here; the 0–2 selection is the post-watch prompt's, not the sheet's.
-
 import { useEffect, useRef, useState } from 'react';
 import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 

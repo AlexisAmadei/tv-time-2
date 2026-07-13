@@ -17,9 +17,6 @@ type HealthState =
   | { phase: 'ok' }
   | { phase: 'error'; message: string };
 
-// Providers wrap the whole tree: SafeAreaProvider (bottom-bar insets, Story 1.3
-// Task 4) and ThemeProvider (dark wired, Story 1.3 Task 2). Everything below
-// them can call useTheme() / useSafeAreaInsets().
 export default function App() {
   return (
     <SafeAreaProvider>
@@ -100,9 +97,6 @@ function AppRoot() {
   );
 }
 
-// Renders the auth screen or the themed app shell depending on session state.
-// Story 1.3 replaced the 1.2 SignedInScreen with <AppShell> (bottom navigation);
-// the 1.2 session gate is preserved.
 function AuthGate() {
   const { session, loading } = useSession();
 

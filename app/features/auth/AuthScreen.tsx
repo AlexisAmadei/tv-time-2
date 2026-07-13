@@ -1,16 +1,3 @@
-// Sign-up / sign-in screen (Story 1.2).
-//
-// Deliberately minimal and unstyled — the themed visual shell and bottom nav are
-// Story 1.3. This screen exists to exercise the three Google-free auth paths:
-//   1. Sign up with email + password (+ @username captured at sign-up)
-//   2. Sign in with email + password
-//   3. Magic link via one-time code (OTP): request a code by email, then verify
-//      it. We use the emailed 6-digit code rather than a deep link — no URL-scheme
-//      plumbing needed (that is deferred).
-//
-// On success, supabase.auth fires onAuthStateChange and App swaps to the signed-in
-// view; this screen does not navigate itself.
-
 import { useState } from 'react';
 import {
   ActivityIndicator,

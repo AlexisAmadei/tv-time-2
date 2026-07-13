@@ -1,17 +1,3 @@
-// Edit or remove a single logged watch (Story 3.7) — opened by tapping a row
-// in TitleDetailScreen's "Your watches" section (AC3: tap-to-act, no
-// long-press). Same sheet chrome as BulkLogSheet.tsx/RatingPrompt.tsx: a
-// bottom-anchored, transparent, Reduce-Motion-aware RN `Modal` — no new sheet
-// dependency.
-//
-// Unlike RatingPrompt's live per-tap persistence, this sheet has an explicit
-// Save button (AC1) — the four fields (date/rating/moods/note) only persist
-// via `editWatch` when Save is tapped, direct-PostgREST (no outbox — see
-// watchEdit.ts's header for why AD-4 doesn't bind this story). Remove is a
-// second, destructive action behind a confirm Alert (this codebase's first
-// `Alert.alert` usage) — the standard, dependency-free RN confirmation
-// primitive, satisfying AC3's tap-to-act (two-tap confirm, not a long-press).
-
 import { useEffect, useRef, useState } from 'react';
 import {
   AccessibilityInfo,

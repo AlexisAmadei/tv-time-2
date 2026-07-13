@@ -1,9 +1,5 @@
-// Themed app shell + 5-slot bottom navigation (Story 1.3, Task 4).
-//
-// Standalone @react-navigation/native + bottom-tabs v7 (NOT Expo Router) — see
-// the navigation decision in the story Dev Notes. The NavigationContainer is
-// mounted INSIDE the authed branch (App.tsx), so the auth screens stay outside
-// the tab tree.
+// NavigationContainer is mounted INSIDE the authed branch (App.tsx), so the
+// auth screens stay outside the tab tree.
 
 import { useMemo } from 'react';
 import type { Session } from '@supabase/supabase-js';

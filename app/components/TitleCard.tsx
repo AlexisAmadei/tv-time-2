@@ -1,16 +1,3 @@
-// Shared title-card + poster (Story 2.2, extracted from AddScreen).
-//
-// The title-card pattern (UX-DR6, DESIGN.md#Components): horizontal card —
-// poster left, title/meta/stars/mood right, on surface-raised. Used by search
-// results today and by the watchlist shelf / diary / feed in later stories, so
-// it lives here (app/components/) as one implementation instead of re-forking
-// per feature — this is 2.1's flagged "candidate for 2.2" extraction.
-//
-// Scope wall (2.2): the star-row / mood-chip slots are rendered conditionally
-// and stay EMPTY — no rating/mood data exists until Epic 3, so there is nothing
-// to show and we do not fabricate placeholder stars. The ❤️ Add-to-Watchlist
-// affordance (2.3) also lands here later; a TODO marks where.
-
 import { useEffect, useRef, useState } from 'react';
 import { AccessibilityInfo, Animated, Image, Pressable, StyleSheet, Text, View } from 'react-native';
 
@@ -31,15 +18,6 @@ const PARTICLE_DISTANCE = 22;
 
 const absoluteFill = { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0 } as const;
 
-/**
- * Poster with a cool→dark placeholder fallback. Shows the placeholder while the
- * image loads, when there is no poster path, and if the load fails — never a
- * broken image (FR9). The placeholder layers a translucent `cool` wash over the
- * sunken surface to evoke the design's cool→dark gradient.
- *
- * `width`/`height` default to the title-card poster size; the detail screen
- * passes a larger size for its hero poster.
- */
 export function Poster({
   posterPath,
   width = CARD_POSTER_W,
@@ -96,13 +74,6 @@ export function Poster({
   );
 }
 
-/**
- * A single result — the title-card pattern. The whole card is tappable and
- * navigates to title detail (Story 2.2, `onPress`); the log action lives on its
- * own icon button so it never collides with that navigation (nested Pressable —
- * the inner button captures its own taps). `onLog`/`logged` are optional so
- * surfaces without a log affordance (e.g. a future watchlist shelf) can omit it.
- */
 export function TitleCard({
   item,
   onPress,
@@ -345,17 +316,6 @@ export function TitleCard({
   );
 }
 
-/**
- * Grid/card view of a title — poster-forward, 3-per-row layout (HomeScreen's
- * list⇄grid toggle). Unlike TitleCard's horizontal row, the poster IS the
- * card; title/meta sit below it. `posterWidth` is measured by the caller
- * (grid columns are computed from the available row width, not fixed), with
- * height derived from the same 2:3 poster aspect ratio Poster's defaults use
- * (CARD_POSTER_W:CARD_POSTER_H). Carries the same onPress/onMarkWatched
- * affordances as TitleCard so grid view has no functional gap vs list view —
- * the watched control becomes a small corner badge instead of the pill/icon
- * row (there's no room for a second row of controls at this card size).
- */
 export function GridPosterCard({
   item,
   posterWidth,

@@ -1,14 +1,5 @@
-// Custom 5-slot bottom tab bar (Story 1.3, Task 4).
-//
-// A custom `tabBar` renderer (not the default bar) because the layout needs
-// things the default bar can't express: the lifted center (+) FAB, an
-// always-visible label beside/under the active icon, and the tone-based dark
-// styling (surface-raised bar, hairline top border). [UX-DR9, UX-DR13, UX-DR25]
-//
-// Accessibility floor (NFR7): every slot is tap-to-act (no long-press), tap
-// targets are ≥ 44pt / 48dp, active state carries icon + label + color (never
-// color alone), and each control exposes role + selected state to the screen
-// reader.
+// Accessibility floor (NFR7): tap targets are >= 44pt/48dp, active state
+// carries icon + label + color (never color alone).
 
 import { Feather } from '@expo/vector-icons';
 import type { BottomTabBarProps } from '@react-navigation/bottom-tabs';

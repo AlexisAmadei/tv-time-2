@@ -1,25 +1,3 @@
-// Home — Up Next (Story 3.1) above Watchlist (Story 2.4).
-//
-// Up Next is new: tracked shows/films (3.1's "I'm watching this") surfaced
-// here so what a user is watching is waiting for them the moment the app
-// opens. It renders FIRST per the IA table (EXPERIENCE.md — "Home / Up Next
-// ... Current shows to continue + Watchlist shelf + Recommendations shelf").
-// The Watchlist shelf below is otherwise unchanged from 2.4 — same
-// getWatchlist() call, same per-item enrichment.
-//
-// Each shelf loads independently — its own phase, hasLoadedRef, requestSeq —
-// reusing 2.4's shelf pattern verbatim (copied, not re-derived: that pattern
-// was hardened by 2.4's code review against false-empty-on-all-enrichment-
-// fail, focus-refetch races, and spinner flicker). A slow/failed shelf must
-// never block or blank the other, so the two loads run independently rather
-// than behind one combined phase.
-//
-// This story also owns the whole-page empty-state reconciliation 2.4's Dev
-// Notes explicitly deferred here: once BOTH shelves have resolved to loaded
-// and empty, Home shows EXPERIENCE.md's "Empty Home (new user)" copy instead
-// of the two separate per-shelf empty rows. A shelf still loading/erroring is
-// "not yet decided" and keeps showing its own state.
-
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,

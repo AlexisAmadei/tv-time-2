@@ -1,11 +1,3 @@
-// Home-tab stack navigator (Story 2.4).
-//
-// Mirrors AddStack.tsx: Home was tab-only (no stack) until the Watchlist shelf
-// needed to push title detail from a tapped shelf card — the exact story
-// AddStack.tsx's own comment predicted ("2.4's Home watchlist shelf"). HomeMain
-// is the initial route, TitleDetail is pushed on top, header hidden (the detail
-// screen owns its own back affordance, same as AddStack).
-
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 
 import HomeScreen from '../features/home/HomeScreen';

@@ -1,24 +1,3 @@
-// Diary — every watch the user has ever logged, reverse-chronological
-// (Story 4.1, FR22). A fresh build, not a resurrection of the Story 1.3
-// placeholder: that file (and the "Diary" bottom-tab slot) was deleted in
-// Story 3.7/3.8's landed diff, which permanently repurposed the tab for
-// Recommendations. This story reaches the Diary from the Profile ("You") tab
-// instead (see ProfileStack.tsx) — no bottom-nav change.
-//
-// Reuses Story 3.7's edit/remove data layer (`editWatch`/`removeWatch`) and
-// `EditWatchSheet.tsx` verbatim (AC5) — this screen adds no new write path,
-// only a new paginated cross-title read (`getDiaryPage`, Story 4.1's own
-// addition to `watchEdit.ts`) and a list UI around it.
-//
-// Two things make this screen genuinely new, not a copy of an existing shelf:
-//   1. Keyset-cursor infinite scroll (mirrors RecommendationsScreen's
-//      page/loadingMore/onEndReached shape, but paginates a live-mutating
-//      table via a watched_at+id cursor rather than a stateless page number
-//      — see watchEdit.ts's getDiaryPage for why).
-//   2. Enrichment deduped by title, not by row — a rewatched title or a
-//      bulk-logged season produces many Diary rows sharing one tmdbId, unlike
-//      every other shelf where each row is already a distinct title.
-
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
 
