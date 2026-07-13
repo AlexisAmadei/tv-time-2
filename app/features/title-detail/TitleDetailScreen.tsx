@@ -468,7 +468,7 @@ export default function TitleDetailScreen({ route, navigation }: Props) {
                     color={theme.colors.primary}
                   />
                   <Text style={styles.watchlistLabel}>
-                    {tracked ? 'Tracking' : "I'm watching this"}
+                    {tracked ? 'Tracking' : "Start tracking"}
                   </Text>
                 </Pressable>
               )}

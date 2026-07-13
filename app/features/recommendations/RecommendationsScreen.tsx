@@ -9,6 +9,7 @@ import {
   AccessibilityInfo,
   ActivityIndicator,
   Animated,
+  Easing,
   FlatList,
   LayoutAnimation,
   NativeScrollEvent,
@@ -194,8 +195,16 @@ export default function RecommendationsScreen({ navigation }: Props) {
     setWatchlistKeys(next);
   }, []);
 
-  const [confirmation, setConfirmation] = useState<string | null>(null);
+  // Transient bottom toast — same slide-up-and-fade pattern as AddScreen's
+  // showToast (Reduce Motion snaps it in/out instead of animating).
+  const [toastMounted, setToastMounted] = useState(false);
+  const [toastMsg, setToastMsg] = useState('');
   const confirmationTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const toastAnim = useRef(new Animated.Value(0)).current;
+  const [reduceMotion, setReduceMotion] = useState(false);
+  // Mirror of `reduceMotion` so the deferred dismiss closure reads the
+  // *current* value (the user may toggle Reduce Motion during the 3s up).
+  const reduceMotionRef = useRef(false);
 
   const mountedRef = useRef(true);
   useEffect(() => {
@@ -203,16 +212,55 @@ export default function RecommendationsScreen({ navigation }: Props) {
     return () => {
       mountedRef.current = false;
       if (confirmationTimer.current) clearTimeout(confirmationTimer.current);
+      toastAnim.stopAnimation();
     };
+  }, [toastAnim]);
+
+  useEffect(() => {
+    AccessibilityInfo.isReduceMotionEnabled().then(setReduceMotion);
+    const sub = AccessibilityInfo.addEventListener('reduceMotionChanged', setReduceMotion);
+    return () => sub.remove();
   }, []);
 
-  const showConfirmation = useCallback((message: string) => {
-    setConfirmation(message);
-    if (confirmationTimer.current) clearTimeout(confirmationTimer.current);
-    confirmationTimer.current = setTimeout(() => {
-      if (mountedRef.current) setConfirmation(null);
-    }, CONFIRMATION_DISMISS_MS);
-  }, []);
+  useEffect(() => {
+    reduceMotionRef.current = reduceMotion;
+  }, [reduceMotion]);
+
+  const showConfirmation = useCallback(
+    (message: string) => {
+      setToastMsg(message);
+      setToastMounted(true);
+      toastAnim.stopAnimation();
+      if (reduceMotionRef.current) {
+        toastAnim.setValue(1);
+      } else {
+        toastAnim.setValue(0);
+        Animated.timing(toastAnim, {
+          toValue: 1,
+          duration: 220,
+          easing: Easing.out(Easing.cubic),
+          useNativeDriver: true,
+        }).start();
+      }
+
+      if (confirmationTimer.current) clearTimeout(confirmationTimer.current);
+      confirmationTimer.current = setTimeout(() => {
+        if (reduceMotionRef.current) {
+          if (mountedRef.current) setToastMounted(false);
+          return;
+        }
+        Animated.timing(toastAnim, {
+          toValue: 0,
+          duration: 180,
+          easing: Easing.in(Easing.cubic),
+          useNativeDriver: true,
+        }).start(({ finished }) => {
+          if (finished && mountedRef.current) setToastMounted(false);
+        });
+      }, CONFIRMATION_DISMISS_MS);
+    },
+    [toastAnim],
+  );
 
   // Per-tab request sequence numbers so a superseded first-page load (e.g. a
   // refocus firing mid-flight) never clobbers a newer one's result.
@@ -427,12 +475,6 @@ export default function RecommendationsScreen({ navigation }: Props) {
         })}
       </View>
 
-      {confirmation && (
-        <Text style={styles.confirmation} accessibilityLiveRegion="polite">
-          {confirmation}
-        </Text>
-      )}
-
       <ScrollView
         ref={tabScrollRef}
         horizontal
@@ -489,18 +531,54 @@ export default function RecommendationsScreen({ navigation }: Props) {
           );
         })}
       </ScrollView>
+
+      {toastMounted && (
+        <Animated.View
+          style={[
+            styles.toast,
+            {
+              opacity: toastAnim,
+              transform: [
+                {
+                  translateY: toastAnim.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: [24, 0],
+                  }),
+                },
+              ],
+            },
+          ]}
+          pointerEvents="none"
+          accessibilityLiveRegion="polite"
+        >
+          <Text style={styles.toastText}>{toastMsg}</Text>
+        </Animated.View>
+      )}
     </Screen>
   );
 }
 
 function makeStyles(theme: Theme) {
-  const { colors, type, spacing } = theme;
+  const { colors, type, spacing, radius } = theme;
   return StyleSheet.create({
-    confirmation: {
-      ...type.meta,
-      color: colors.inkSecondary,
-      marginBottom: spacing.sm,
+    // Transient, non-blocking confirmation — a bottom toast overlay, not a
+    // modal, so it never gates the tab pager (`pointerEvents: 'none'`,
+    // absolute, out of layout flow). Slides up + fades in on tap, reverses on
+    // auto-dismiss; Reduce Motion skips the animation and shows/hides it
+    // directly. Mirrors AddScreen's toast.
+    toast: {
+      position: 'absolute',
+      left: 0,
+      right: 0,
+      bottom: spacing.lg,
+      marginHorizontal: spacing.lg,
+      alignItems: 'center',
+      backgroundColor: colors.surfaceRaised,
+      borderRadius: radius.md,
+      paddingHorizontal: spacing.lg,
+      paddingVertical: spacing.md,
     },
+    toastText: { ...type.label, color: colors.primary },
     tabBar: {
       flexDirection: 'row',
       borderBottomWidth: StyleSheet.hairlineWidth,
