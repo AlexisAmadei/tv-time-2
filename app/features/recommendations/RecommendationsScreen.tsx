@@ -1,8 +1,8 @@
-// Recommendations tab — the curated list (Story 3.8's recommendations.ts)
-// shown full-screen instead of just as a Home shelf, split into Series/Movies
-// tabs. Mirrors HomeScreen's swipeable MEDIA_TABS pager and its recs-shelf
-// load/enrich/dedupe/❤️-toggle logic verbatim (same source, same behavior —
-// just its own screen instead of buried at the bottom of Home).
+// Recommendations tab — an endless, non-personalized feed proxied through the
+// `catalog-recommendations` Edge Function (TMDB /discover, popularity-sorted,
+// paged), split into Series/Movies tabs. Mirrors HomeScreen's swipeable
+// MEDIA_TABS pager and the recs-shelf's load/dedupe/❤️-toggle logic, but each
+// tab now paginates independently via FlatList's onEndReached.
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
@@ -27,9 +27,9 @@ import { Screen } from '../../components/Screen';
 import { TitleCard } from '../../components/TitleCard';
 import { useTheme } from '../../theme/ThemeProvider';
 import type { Theme } from '../../theme/tokens';
-import { fetchTitleDetail, type CatalogResult } from '../../data/catalog';
+import type { CatalogResult } from '../../data/catalog';
 import { getWatchlistKeys, writeWatchlist } from '../../data/watchlist';
-import { getRecommendations } from '../../data/recommendations';
+import { fetchRecommendations } from '../../data/recommendations';
 import { getLoggedKeys, watchKey } from '../../data/watchLog';
 import type { RecommendationsStackParamList } from '../../navigation/RecommendationsStack';
 
@@ -46,11 +46,25 @@ const MEDIA_TABS: { key: 'tv' | 'movie'; label: string }[] = [
   { key: 'movie', label: 'Movies' },
 ];
 
+type TabKey = 'tv' | 'movie';
+
 // No 'error' phase: recommendations are pure garnish (AC2) — a hard failure
-// silently degrades to an empty 'loaded' state, never an error/retry UI.
+// silently degrades to an empty 'loaded' state (or, for a page-2+ failure,
+// just stops pagination), never an error/retry UI.
 type Phase = 'loading' | 'loaded';
 
 const REMOVE_ANIM_MS = 280;
+
+interface TabState {
+  items: CatalogResult[];
+  nextPage: number | null;
+  phase: Phase;
+  loadingMore: boolean;
+}
+
+function makeInitialTabState(): TabState {
+  return { items: [], nextPage: 1, phase: 'loading', loadingMore: false };
+}
 
 // Wraps a card so adding it to the watchlist can slide/fade it out of the
 // recommendations list instead of just snapping away — `removing` flips true
@@ -125,13 +139,13 @@ export default function RecommendationsScreen({ navigation }: Props) {
   const theme = useTheme();
   const styles = makeStyles(theme);
 
-  const [activeTab, setActiveTab] = useState<'tv' | 'movie'>('tv');
+  const [activeTab, setActiveTab] = useState<TabKey>('tv');
   const tabScrollRef = useRef<ScrollView>(null);
   const [pagerWidth, setPagerWidth] = useState(0);
   const isProgrammaticScroll = useRef(false);
 
   const handleTabPress = useCallback(
-    (key: 'tv' | 'movie') => {
+    (key: TabKey) => {
       if (pagerWidth) {
         const index = MEDIA_TABS.findIndex((t) => t.key === key);
         isProgrammaticScroll.current = true;
@@ -156,8 +170,20 @@ export default function RecommendationsScreen({ navigation }: Props) {
     [pagerWidth],
   );
 
-  const [phase, setPhase] = useState<Phase>('loading');
-  const [items, setItems] = useState<CatalogResult[]>([]);
+  const [tabs, setTabs] = useState<Record<TabKey, TabState>>({
+    tv: makeInitialTabState(),
+    movie: makeInitialTabState(),
+  });
+  // Mirrors `tabs` synchronously so loadMore can read current paging state
+  // (nextPage/loadingMore) without waiting on a render.
+  const tabsRef = useRef(tabs);
+  useEffect(() => {
+    tabsRef.current = tabs;
+  }, [tabs]);
+  const updateTab = useCallback((tab: TabKey, patch: Partial<TabState>) => {
+    setTabs((prev) => ({ ...prev, [tab]: { ...prev[tab], ...patch } }));
+  }, []);
+
   const [pendingRemoval, setPendingRemoval] = useState<Set<string>>(new Set());
   const [watchlistKeys, setWatchlistKeys] = useState<Set<string>>(new Set());
   const watchlistKeysRef = useRef<Set<string>>(new Set());
@@ -188,68 +214,105 @@ export default function RecommendationsScreen({ navigation }: Props) {
     }, CONFIRMATION_DISMISS_MS);
   }, []);
 
-  const requestSeq = useRef(0);
-  const hasLoadedRef = useRef(false);
+  // Per-tab request sequence numbers so a superseded first-page load (e.g. a
+  // refocus firing mid-flight) never clobbers a newer one's result.
+  const requestSeqRef = useRef<Record<TabKey, number>>({ tv: 0, movie: 0 });
+  const hasLoadedRef = useRef<Record<TabKey, boolean>>({ tv: false, movie: false });
 
-  const load = useCallback(async () => {
-    const seq = ++requestSeq.current;
-    if (!hasLoadedRef.current) setPhase('loading');
-    try {
-      const list = getRecommendations();
-      const settled = await Promise.allSettled(
-        list.map((rec) => fetchTitleDetail(rec.tmdbId, rec.mediaType)),
-      );
-      if (!mountedRef.current || seq !== requestSeq.current) return; // superseded
-      const resolved: CatalogResult[] = [];
-      settled.forEach((result, i) => {
-        if (result.status === 'fulfilled') {
-          const { detail } = result.value;
-          resolved.push({
-            tmdbId: detail.tmdbId,
-            mediaType: detail.mediaType,
-            title: detail.title,
-            year: detail.year,
-            posterPath: detail.posterPath,
-          });
-        } else {
-          console.warn('recommendations: failed to resolve title', list[i], result.reason);
-        }
-      });
-      if (list.length > 0 && resolved.length === 0) {
-        setItems([]);
-        hasLoadedRef.current = true;
-        setPhase('loaded');
-        return;
+  // Loads (or reloads) page 1 for a tab, replacing its item list.
+  const load = useCallback(
+    async (tab: TabKey) => {
+      const seq = ++requestSeqRef.current[tab];
+      if (!hasLoadedRef.current[tab]) updateTab(tab, { phase: 'loading' });
+      try {
+        const page = await fetchRecommendations(tab, 1);
+        if (!mountedRef.current || seq !== requestSeqRef.current[tab]) return; // superseded
+
+        const [wlKeys, loggedKeys] = await Promise.all([
+          getWatchlistKeys(page.items),
+          getLoggedKeys(page.items),
+        ]);
+        if (!mountedRef.current || seq !== requestSeqRef.current[tab]) return; // superseded
+
+        const filtered = page.items.filter((item) => {
+          const key = watchKey(item.tmdbId, item.mediaType);
+          return !wlKeys.has(key) && !loggedKeys.has(key);
+        });
+        updateTab(tab, { items: filtered, nextPage: page.nextPage, phase: 'loaded' });
+        hasLoadedRef.current[tab] = true;
+        applyWatchlist((prev) => {
+          const next = new Set(prev);
+          for (const k of wlKeys) if (!watchlistDirtyRef.current.has(k)) next.add(k);
+          return next;
+        });
+      } catch (err) {
+        if (!mountedRef.current || seq !== requestSeqRef.current[tab]) return; // superseded
+        console.warn('recommendations: load failed', tab, err);
+        updateTab(tab, { items: [], nextPage: null, phase: 'loaded' });
+        hasLoadedRef.current[tab] = true;
       }
-      const [wlKeys, loggedKeys] = await Promise.all([
-        getWatchlistKeys(resolved),
-        getLoggedKeys(resolved),
-      ]);
-      if (!mountedRef.current || seq !== requestSeq.current) return; // superseded
-      const filtered = resolved.filter((item) => {
-        const key = watchKey(item.tmdbId, item.mediaType);
-        return !wlKeys.has(key) && !loggedKeys.has(key);
-      });
-      setItems(filtered);
-      hasLoadedRef.current = true;
-      setPhase('loaded');
-      applyWatchlist((prev) => {
-        const next = new Set(prev);
-        for (const k of wlKeys) if (!watchlistDirtyRef.current.has(k)) next.add(k);
-        return next;
-      });
-    } catch (err) {
-      if (!mountedRef.current || seq !== requestSeq.current) return; // superseded
-      console.warn('recommendations: load failed', err);
-      setItems([]);
-      hasLoadedRef.current = true;
-      setPhase('loaded');
-    }
-  }, [applyWatchlist]);
+    },
+    [applyWatchlist, updateTab],
+  );
+
+  // Loads the next page for a tab and appends it — recommendations are pure
+  // garnish, so a failed page-2+ fetch just stops pagination silently rather
+  // than surfacing an error/retry UI.
+  const loadMore = useCallback(
+    async (tab: TabKey) => {
+      const state = tabsRef.current[tab];
+      if (state.loadingMore || state.nextPage === null || state.phase !== 'loaded') return;
+      const targetPage = state.nextPage;
+      updateTab(tab, { loadingMore: true });
+
+      try {
+        const page = await fetchRecommendations(tab, targetPage);
+        if (!mountedRef.current) return;
+
+        const [wlKeys, loggedKeys] = await Promise.all([
+          getWatchlistKeys(page.items),
+          getLoggedKeys(page.items),
+        ]);
+        if (!mountedRef.current) return;
+
+        setTabs((prev) => {
+          const state = prev[tab];
+          const existingKeys = new Set(
+            state.items.map((i) => watchKey(i.tmdbId, i.mediaType)),
+          );
+          const fresh = page.items.filter((item) => {
+            const key = watchKey(item.tmdbId, item.mediaType);
+            if (existingKeys.has(key)) return false;
+            return !wlKeys.has(key) && !loggedKeys.has(key);
+          });
+          return {
+            ...prev,
+            [tab]: {
+              ...state,
+              items: [...state.items, ...fresh],
+              nextPage: page.nextPage,
+              loadingMore: false,
+            },
+          };
+        });
+        applyWatchlist((prev) => {
+          const next = new Set(prev);
+          for (const k of wlKeys) if (!watchlistDirtyRef.current.has(k)) next.add(k);
+          return next;
+        });
+      } catch (err) {
+        if (!mountedRef.current) return;
+        console.warn('recommendations: loadMore failed', tab, err);
+        updateTab(tab, { loadingMore: false, nextPage: null });
+      }
+    },
+    [applyWatchlist, updateTab],
+  );
 
   useFocusEffect(
     useCallback(() => {
-      load();
+      load('tv');
+      load('movie');
     }, [load]),
   );
 
@@ -264,12 +327,20 @@ export default function RecommendationsScreen({ navigation }: Props) {
   );
 
   // Fires once a card's fade/slide-out animation finishes — actually drops
-  // the item from the list, letting LayoutAnimation smooth the gap closing
-  // for the cards below it.
+  // the item from its tab's list, letting LayoutAnimation smooth the gap
+  // closing for the cards below it.
   const handleRemoved = useCallback((item: CatalogResult) => {
     const key = watchKey(item.tmdbId, item.mediaType);
     LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-    setItems((prev) => prev.filter((i) => watchKey(i.tmdbId, i.mediaType) !== key));
+    setTabs((prev) => ({
+      ...prev,
+      [item.mediaType]: {
+        ...prev[item.mediaType],
+        items: prev[item.mediaType].items.filter(
+          (i) => watchKey(i.tmdbId, i.mediaType) !== key,
+        ),
+      },
+    }));
     setPendingRemoval((prev) => {
       if (!prev.has(key)) return prev;
       const next = new Set(prev);
@@ -291,7 +362,7 @@ export default function RecommendationsScreen({ navigation }: Props) {
       });
       if (desired) {
         // Adding to the watchlist hides the card here — start the animation;
-        // handleRemoved drops it from `items` once it finishes.
+        // handleRemoved drops it from the tab's items once it finishes.
         setPendingRemoval((prev) => new Set(prev).add(key));
       }
 
@@ -312,17 +383,21 @@ export default function RecommendationsScreen({ navigation }: Props) {
           });
           if (desired) {
             // Roll back the hide — restore the card if it's still (or
-            // already) gone from the list.
+            // already) gone from its tab's list.
             setPendingRemoval((prev) => {
               if (!prev.has(key)) return prev;
               const next = new Set(prev);
               next.delete(key);
               return next;
             });
-            setItems((prev) => {
-              if (prev.some((i) => watchKey(i.tmdbId, i.mediaType) === key)) return prev;
+            setTabs((prev) => {
+              const state = prev[item.mediaType];
+              if (state.items.some((i) => watchKey(i.tmdbId, i.mediaType) === key)) return prev;
               LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-              return [...prev, item];
+              return {
+                ...prev,
+                [item.mediaType]: { ...state, items: [...state.items, item] },
+              };
             });
           }
           showConfirmation(COPY_WATCHLIST_FAILED);
@@ -330,11 +405,6 @@ export default function RecommendationsScreen({ navigation }: Props) {
     },
     [applyWatchlist, showConfirmation],
   );
-
-  const itemsByTab = {
-    tv: items.filter((item) => item.mediaType === 'tv'),
-    movie: items.filter((item) => item.mediaType === 'movie'),
-  };
 
   return (
     <Screen>
@@ -372,40 +442,52 @@ export default function RecommendationsScreen({ navigation }: Props) {
         onLayout={(e) => setPagerWidth(e.nativeEvent.layout.width)}
         style={styles.tabPager}
       >
-        {MEDIA_TABS.map((tab) => (
-          <View key={tab.key} style={[styles.page, pagerWidth ? { width: pagerWidth } : null]}>
-            {phase === 'loading' && (
-              <View style={styles.centerState}>
-                <ActivityIndicator color={theme.colors.primary} />
-              </View>
-            )}
+        {MEDIA_TABS.map((tab) => {
+          const state = tabs[tab.key];
+          return (
+            <View key={tab.key} style={[styles.page, pagerWidth ? { width: pagerWidth } : null]}>
+              {state.phase === 'loading' && (
+                <View style={styles.centerState}>
+                  <ActivityIndicator color={theme.colors.primary} />
+                </View>
+              )}
 
-            {phase === 'loaded' && itemsByTab[tab.key].length === 0 && (
-              <Text style={styles.stateText}>{COPY_EMPTY}</Text>
-            )}
+              {state.phase === 'loaded' && state.items.length === 0 && (
+                <Text style={styles.stateText}>{COPY_EMPTY}</Text>
+              )}
 
-            {phase === 'loaded' && itemsByTab[tab.key].length > 0 && (
-              <FlatList
-                data={itemsByTab[tab.key]}
-                keyExtractor={(item) => `${item.mediaType}:${item.tmdbId}`}
-                renderItem={({ item }) => (
-                  <View style={styles.card}>
-                    <RecommendationCard
-                      item={item}
-                      removing={pendingRemoval.has(watchKey(item.tmdbId, item.mediaType))}
-                      onRemoved={handleRemoved}
-                      onPress={handleOpenDetail}
-                      onToggleWatchlist={handleToggleWatchlist}
-                      watchlisted={watchlistKeys.has(watchKey(item.tmdbId, item.mediaType))}
-                    />
-                  </View>
-                )}
-                contentContainerStyle={styles.listContent}
-                showsVerticalScrollIndicator={false}
-              />
-            )}
-          </View>
-        ))}
+              {state.phase === 'loaded' && state.items.length > 0 && (
+                <FlatList
+                  data={state.items}
+                  keyExtractor={(item) => `${item.mediaType}:${item.tmdbId}`}
+                  renderItem={({ item }) => (
+                    <View style={styles.card}>
+                      <RecommendationCard
+                        item={item}
+                        removing={pendingRemoval.has(watchKey(item.tmdbId, item.mediaType))}
+                        onRemoved={handleRemoved}
+                        onPress={handleOpenDetail}
+                        onToggleWatchlist={handleToggleWatchlist}
+                        watchlisted={watchlistKeys.has(watchKey(item.tmdbId, item.mediaType))}
+                      />
+                    </View>
+                  )}
+                  contentContainerStyle={styles.listContent}
+                  showsVerticalScrollIndicator={false}
+                  onEndReachedThreshold={0.5}
+                  onEndReached={() => loadMore(tab.key)}
+                  ListFooterComponent={
+                    state.loadingMore ? (
+                      <View style={styles.footer}>
+                        <ActivityIndicator color={theme.colors.primary} />
+                      </View>
+                    ) : null
+                  }
+                />
+              )}
+            </View>
+          );
+        })}
       </ScrollView>
     </Screen>
   );
@@ -457,5 +539,6 @@ function makeStyles(theme: Theme) {
     },
     listContent: { paddingTop: spacing.md, paddingBottom: spacing.xl, gap: spacing.md },
     card: { width: '100%' },
+    footer: { paddingVertical: spacing.md, alignItems: 'center' },
   });
 }

@@ -1,53 +1,65 @@
-// Recommendations source (Story 3.8, FR42) — a CURATED STATIC LIST, not a recommender.
+// Recommendations data source — the endless, non-personalized feed proxied
+// through the `catalog-recommendations` Edge Function (TMDB /discover, sorted
+// by popularity, paged). Mirrors `searchCatalog`'s exact shape in catalog.ts:
+// the one supabase client, an INVOKE_TIMEOUT_MS race, envelope-parsing via
+// `isErrorEnvelope`, `CatalogError` on failure.
 //
-// FR42 is deliberately permissive: Home *may* show a Recommendations shelf built
-// from "at most a simple, non-LLM heuristic ... or a curated shelf," and it *may*
-// ship empty/absent. The real feature — LLM-powered recommendations that read your
-// own history and mood/rating sentiment — is explicitly a v2 bet (see PRD Vision).
-// So v1 spends that permission on the lowest-risk form: a small hand-picked list of
-// broadly-appealing titles, identified by TMDB id only.
-//
-// AD-6 boundary: this file holds *ids only* — never TMDB data. The poster/title/year
-// for each recommendation is enriched at render time through the existing proxied
-// `fetchTitleDetail` (catalog.ts), exactly like Up Next / Watchlist rows on Home.
-// The client never calls TMDB and never holds the key.
-//
-// The exact titles are not load-bearing — they just need to be resolvable and
-// broadly recognizable. Any id that fails to enrich is dropped gracefully by
-// HomeScreen's `Promise.allSettled` (same as an Up Next card with missing
-// metadata), so a stale/wrong id degrades, never crashes.
-//
-// Open question (see story): move this list server-side / make it editable without
-// an app release. For v1 it is a deliberate hardcoded shortcut, not a final shape.
+// AD-6 boundary: the client never calls TMDB and never holds the key. Unlike
+// the old v1 static list, results now arrive as full CatalogResult rows
+// (title/year/poster already resolved) — no more per-item fetchTitleDetail
+// enrichment fan-out.
 
-export interface Recommendation {
-  tmdbId: number;
-  mediaType: 'movie' | 'tv';
+import { isErrorEnvelope } from '@popcorn-time/shared-types';
+
+import { supabase } from './supabaseClient';
+import { CatalogError, type CatalogResult } from './catalog';
+
+export interface RecommendationsPage {
+  items: CatalogResult[];
+  nextPage: number | null;
 }
 
-const RECOMMENDATIONS: Recommendation[] = [
-  // TV
-  { tmdbId: 1396, mediaType: 'tv' }, // Breaking Bad
-  { tmdbId: 136315, mediaType: 'tv' }, // The Bear
-  { tmdbId: 1399, mediaType: 'tv' }, // Game of Thrones
-  { tmdbId: 66732, mediaType: 'tv' }, // Stranger Things
-  { tmdbId: 100088, mediaType: 'tv' }, // The Last of Us
-  { tmdbId: 95396, mediaType: 'tv' }, // Severance
-  // Movies
-  { tmdbId: 550, mediaType: 'movie' }, // Fight Club
-  { tmdbId: 496243, mediaType: 'movie' }, // Parasite
-  { tmdbId: 27205, mediaType: 'movie' }, // Inception
-  { tmdbId: 545611, mediaType: 'movie' }, // Everything Everywhere All at Once
-  { tmdbId: 438631, mediaType: 'movie' }, // Dune
-  { tmdbId: 603, mediaType: 'movie' }, // The Matrix
-];
+const CATALOG_UNAVAILABLE =
+  "Couldn't reach the catalog — check your connection and try again.";
+
+// Same bound as searchCatalog in catalog.ts.
+const INVOKE_TIMEOUT_MS = 10000;
+
+function rejectAfter(ms: number): Promise<never> {
+  return new Promise((_, reject) =>
+    setTimeout(() => reject(new CatalogError(CATALOG_UNAVAILABLE, 'catalog_timeout')), ms),
+  );
+}
 
 /**
- * The curated recommendation list (Story 3.8). A plain function today so a future
- * v2 can swap the static list for a real (server/history/LLM) source without
- * changing the call site. Synchronous and local — it performs no network of its
- * own; enrichment happens in the caller through the proxied catalog.
+ * Fetch one page of the recommendations feed for a media type. Throws
+ * {@link CatalogError} on failure so the caller can degrade silently
+ * (recommendations are pure garnish — see RecommendationsScreen).
  */
-export function getRecommendations(): Recommendation[] {
-  return RECOMMENDATIONS;
+export async function fetchRecommendations(
+  mediaType: 'movie' | 'tv',
+  page: number,
+): Promise<RecommendationsPage> {
+  const { data, error } = await Promise.race([
+    supabase.functions.invoke('catalog-recommendations', { body: { mediaType, page } }),
+    rejectAfter(INVOKE_TIMEOUT_MS),
+  ]);
+
+  if (error) {
+    const context = (error as { context?: unknown }).context;
+    if (context instanceof Response) {
+      try {
+        const body = await context.json();
+        if (isErrorEnvelope(body)) throw new CatalogError(body.message, body.code);
+      } catch (parseErr) {
+        if (parseErr instanceof CatalogError) throw parseErr;
+        // fall through to the generic message
+      }
+    }
+    throw new CatalogError(CATALOG_UNAVAILABLE, 'catalog_unavailable');
+  }
+
+  const items = Array.isArray(data?.results) ? (data.results as CatalogResult[]) : [];
+  const nextPage = typeof data?.nextPage === 'number' ? data.nextPage : null;
+  return { items, nextPage };
 }
