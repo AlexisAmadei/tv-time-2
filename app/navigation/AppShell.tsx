@@ -16,7 +16,7 @@ import AddStack from './AddStack';
 import HomeStack from './HomeStack';
 import RecommendationsStack from './RecommendationsStack';
 import FeedScreen from '../features/feed/FeedScreen';
-import ProfileScreen from '../features/profile/ProfileScreen';
+import ProfileStack from './ProfileStack';
 
 export type RootTabParamList = {
   Home: undefined;
@@ -67,9 +67,12 @@ export default function AppShell({ session }: { session: Session }) {
             the title-detail screen; AddScreen stays the initial route. */}
         <Tab.Screen name="Add" component={AddStack} options={{ title: 'Add' }} />
         <Tab.Screen name="Feed" component={FeedScreen} options={{ title: 'Feed' }} />
-        {/* Labeled "You" in the UI; route stays `Profile`. Holds temporary sign-out. */}
+        {/* Labeled "You" in the UI; route stays `Profile`. Holds temporary
+            sign-out plus, since Story 4.1, the Diary entry point — wrapped in
+            its own stack (mirrors Add/Home/Recommendations) so Profile can
+            push Diary. */}
         <Tab.Screen name="Profile" options={{ title: 'You' }}>
-          {() => <ProfileScreen session={session} />}
+          {() => <ProfileStack session={session} />}
         </Tab.Screen>
       </Tab.Navigator>
     </NavigationContainer>

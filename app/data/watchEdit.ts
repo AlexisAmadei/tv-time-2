@@ -20,6 +20,11 @@ import { supabase } from './supabaseClient';
 // Same bound as every other network call in this codebase.
 const WATCH_EDIT_TIMEOUT_MS = 10_000;
 
+// Diary page size (Story 4.1) — a plain constant, same convention as the
+// timeout above. Keyset-paginated (see getDiaryPage) rather than offset-based,
+// so this only bounds a single page's row count, not the Diary's total size.
+const DIARY_PAGE_SIZE = 30;
+
 /** One logged watch (Story 3.7) — camelCase mirror of a `watches` read, for
  *  the "Your watches" section and its edit sheet. */
 export interface LoggedWatch {
@@ -31,11 +36,56 @@ export interface LoggedWatch {
   note: string | null;
 }
 
+/**
+ * One Diary row (Story 4.1) — a `LoggedWatch` that also carries which title
+ * it belongs to. `getWatchesForTitle`'s `LoggedWatch` omits `tmdbId`/
+ * `mediaType` because that caller already knows them (single-title context);
+ * the Diary spans every title the user has ever logged, so each row must
+ * carry its own.
+ */
+export interface DiaryWatch extends LoggedWatch {
+  tmdbId: number;
+  mediaType: 'movie' | 'tv';
+}
+
+/** Keyset pagination cursor for the Diary (Story 4.1) — see getDiaryPage's
+ *  own comment for why this is a keyset cursor, not an offset. */
+export interface DiaryCursor {
+  watchedAt: string;
+  id: string;
+}
+
+export interface DiaryPage {
+  rows: DiaryWatch[];
+  nextCursor: DiaryCursor | null;
+}
+
 export interface EditWatchInput {
   watchedAt?: string;
   rating?: number | null;
   moods?: string[];
   note?: string | null;
+}
+
+/** Shared row → camelCase decode for both getWatchesForTitle and
+ *  getDiaryPage — the only difference between those two reads is the filter/
+ *  select-columns, not this mapping, so it lives in one place. */
+function decodeLoggedWatchRow(row: {
+  id: string;
+  tmdb_episode_id: number | null;
+  watched_at: string;
+  rating: number | null;
+  mood: string[] | null;
+  note: string | null;
+}): LoggedWatch {
+  return {
+    id: row.id,
+    tmdbEpisodeId: row.tmdb_episode_id,
+    watchedAt: row.watched_at,
+    rating: row.rating,
+    moods: row.mood ?? [],
+    note: row.note,
+  };
 }
 
 async function requireUserId(): Promise<string> {
@@ -81,14 +131,77 @@ export async function getWatchesForTitle(
       .limit(200)
       .abortSignal(controller.signal);
     if (error) throw error;
-    return (data ?? []).map((row) => ({
-      id: row.id,
-      tmdbEpisodeId: row.tmdb_episode_id,
-      watchedAt: row.watched_at,
-      rating: row.rating,
-      moods: row.mood ?? [],
-      note: row.note,
+    return (data ?? []).map(decodeLoggedWatchRow);
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+/**
+ * The Diary's paginated, cross-title read (Story 4.1) — every watch the user
+ * has ever logged, across every title, newest-first (AC1). Same throws-on-
+ * hard-failure / degrades-to-empty-on-no-session posture as
+ * `getWatchesForTitle` above, for the same reason: this is the Diary's
+ * primary content, not a best-effort hint.
+ *
+ * Keyset-paginated, not offset-paginated (`.range()`). `watches` is a live,
+ * mutating table — a bulk-log (Story 3.4) or an organic watch can insert a
+ * row, and an edit/remove (Story 3.7, reused by the Diary) can delete one,
+ * *while* a user is scrolled partway through their history. An offset like
+ * `.range(30, 59)` shifts under any such change (a new row above the current
+ * scroll position pushes every later offset down by one), producing a
+ * skipped or duplicated row at the next page boundary. A keyset cursor on
+ * `(watched_at, id)` — matching the query's own two-column `ORDER BY` — is
+ * immune to that: the next page is always "everything after this exact row,"
+ * never "everything at this numeric position." The `id` tiebreaker matters
+ * because a bulk-log (3.4) can insert several episodes sharing the exact same
+ * `watched_at` instant, which `watched_at` alone can't order stably.
+ */
+export async function getDiaryPage(cursor?: DiaryCursor): Promise<DiaryPage> {
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
+  if (!session) return { rows: [], nextCursor: null };
+
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), WATCH_EDIT_TIMEOUT_MS);
+  try {
+    // Build the filter half of the query first (eq/or), then chain
+    // order/limit/abortSignal once at the end — keeps `filtered` a single
+    // consistent builder type throughout instead of reassigning across a
+    // filter-vs-transform builder boundary.
+    let filtered = supabase
+      .from('watches')
+      .select('id, tmdb_id, media_type, tmdb_episode_id, watched_at, rating, mood, note')
+      .eq('user_id', session.user.id);
+
+    if (cursor) {
+      // Continue strictly past the last row of the previous page: either an
+      // earlier watched_at, or the same watched_at with a smaller id (the
+      // bulk-log same-instant tiebreak this cursor exists for).
+      filtered = filtered.or(
+        `watched_at.lt.${cursor.watchedAt},and(watched_at.eq.${cursor.watchedAt},id.lt.${cursor.id})`,
+      );
+    }
+
+    const { data, error } = await filtered
+      .order('watched_at', { ascending: false })
+      .order('id', { ascending: false })
+      .limit(DIARY_PAGE_SIZE)
+      .abortSignal(controller.signal);
+    if (error) throw error;
+
+    const rows: DiaryWatch[] = (data ?? []).map((row) => ({
+      ...decodeLoggedWatchRow(row),
+      tmdbId: row.tmdb_id,
+      mediaType: row.media_type,
     }));
+
+    const last = rows[rows.length - 1];
+    const nextCursor: DiaryCursor | null =
+      rows.length === DIARY_PAGE_SIZE && last ? { watchedAt: last.watchedAt, id: last.id } : null;
+
+    return { rows, nextCursor };
   } finally {
     clearTimeout(timer);
   }
