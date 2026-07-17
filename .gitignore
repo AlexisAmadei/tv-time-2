@@ -8,7 +8,8 @@ node_modules/
 # The tracked template is supabase/.env.example.
 supabase/.env
 .env
-.env.local
+.env.*
+
 
 # Supabase self-hosted stack runtime data (Postgres data dir, storage blobs)
 supabase/volumes/db/data/
